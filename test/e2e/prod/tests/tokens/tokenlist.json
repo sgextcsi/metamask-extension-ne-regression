@@ -163,6 +163,210 @@
       "symbol": "APEX",
       "decimals": 18,
       "logoURI": "https://token-list.mantle.xyz/data/APEX/logo.svg"
-    }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x91824fc3573c5043837F6357b72F60014A710501",
+      "name": "Aperture",
+      "symbol": "APTR",
+      "decimals": 6,
+      "logoURI": "https://token-list.mantle.xyz/data/APTR/logo.png",
+    },
+    {
+      "chainId": 5000,
+      "address": "0x23ee2343B892b1BB63503a4FAbc840E0e2C6810f",
+      "name": "Axelar",
+      "symbol": "AXL",
+      "decimals": 6,
+      "logoURI": "https://token-list.mantle.xyz/data/AXL/logo.png"
+    },
+    {
+      "chainId": 5000,
+      "address": "0x3390108e913824b8ead638444cc52b9abdf63798",
+      "name": "Bella",
+      "symbol": "BEL",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/Bella/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "bella-protocol"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0xE6829d9a7eE3040e1276Fa75293Bde931859e8fA",
+      "name": "cmETH",
+      "symbol": "cmETH",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/cmETH/logo.svg",
+      "extensions": {
+        "external": {
+          "name": "mETH Protocol",
+          "url": "https://meth.mantle.xyz/bridge?token=cmeth"
+        }
+      },
+      "tickers": {
+        "coingecko": "mantle-restaked-eth"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x52b7D8851d6CcBC6342ba0855Be65f7B82A3F17f",
+      "name": "Compound",
+      "symbol": "COMP",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/COMP/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "compound-governance-token"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x9F0C013016E8656bC256f948CD4B79ab25c7b94D",
+      "name": "COOK",
+      "symbol": "COOK",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/COOK/logo.svg",
+      "extensions": {
+        "external": {
+          "name": "mETH Protocol",
+          "url": "https://meth.mantle.xyz/bridge?token=cook"
+        }
+      },
+      "tickers": {
+        "coingecko": "meth-protocol"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0xE265FC71d45fd791c9ebf3EE0a53FBB220Eb8f75",
+      "name": "Curve DAO Token",
+      "symbol": "CRV",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/CRV/logo.png",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "curve-dao-token"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x0994206dfE8De6Ec6920FF4D779B0d950605Fb53",
+      "name": "Curve.Fi USD Stablecoin",
+      "symbol": "crvUSD",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/crvUSD/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "crvusd"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0xE7798f023fC62146e8Aa1b36Da45fb70855a77Ea",
+      "name": "Custom UPS",
+      "symbol": "CUPS",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/CUPS/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0xD0CF7dfbF09CAfaB8AEf00e0Ce19a4638004a364",
+      "name": "DODO bird",
+      "symbol": "DODO",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/DODO/logo.png",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "dodo"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x056D4A69D243F176F6d1668722BE386c3D50e27b",
+      "name": "Ember Sword",
+      "symbol": "EMBER",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/EMBER/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "ember-sword"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x58538e6A46E07434d7E7375Bc268D3cb839C0133",
+      "name": "Ethena Token",
+      "symbol": "ENA",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/ENA/logo.svg",
+      "extensions": {
+        "thirdparty": {
+          "name": "LayerZero",
+          "url": "https://stargate.finance/transfer"
+        }
+      },
+      "tickers": {
+        "coingecko": "ethena"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x9e1028F5F1D5eDE59748FFceE5532509976840E0",
+      "name": "Equilibria Pendle",
+      "symbol": "ePendle",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/ePendle/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "equilibria-finance-ependle"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0x3e7eF8f50246f725885102E8238CBba33F276747",
+      "name": "Equilibria Token",
+      "symbol": "EQB",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/EQB/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "equilibria-finance"
+      }
+    },
+    {
+      "chainId": 5000,
+      "address": "0xdEAddEaDdeadDEadDEADDEAddEADDEAddead1111",
+      "name": "Ether",
+      "symbol": "ETH",
+      "decimals": 18,
+      "logoURI": "https://token-list.mantle.xyz/data/ETH/logo.svg",
+      "extensions": {
+        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
+      },
+      "tickers": {
+        "coingecko": "ethereum"
+      }
+    },
   ]
 }
