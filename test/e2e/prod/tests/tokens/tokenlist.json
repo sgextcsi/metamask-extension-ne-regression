@@ -186,13 +186,7 @@
       "name": "Bella",
       "symbol": "BEL",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/Bella/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "bella-protocol"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/Bella/logo.svg"
     },
     {
       "chainId": 5000,
@@ -200,30 +194,14 @@
       "name": "cmETH",
       "symbol": "cmETH",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/cmETH/logo.svg",
-      "extensions": {
-        "external": {
-          "name": "mETH Protocol",
-          "url": "https://meth.mantle.xyz/bridge?token=cmeth"
-        }
-      },
-      "tickers": {
-        "coingecko": "mantle-restaked-eth"
-      }
-    },
+      "logoURI": "https://token-list.mantle.xyz/data/cmETH/logo.svg"
     {
       "chainId": 5000,
       "address": "0x52b7D8851d6CcBC6342ba0855Be65f7B82A3F17f",
       "name": "Compound",
       "symbol": "COMP",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/COMP/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "compound-governance-token"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/COMP/logo.svg"
     },
     {
       "chainId": 5000,
@@ -231,16 +209,7 @@
       "name": "COOK",
       "symbol": "COOK",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/COOK/logo.svg",
-      "extensions": {
-        "external": {
-          "name": "mETH Protocol",
-          "url": "https://meth.mantle.xyz/bridge?token=cook"
-        }
-      },
-      "tickers": {
-        "coingecko": "meth-protocol"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/COOK/logo.svg"
     },
     {
       "chainId": 5000,
@@ -248,13 +217,7 @@
       "name": "Curve DAO Token",
       "symbol": "CRV",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/CRV/logo.png",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "curve-dao-token"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/CRV/logo.png"
     },
     {
       "chainId": 5000,
@@ -262,13 +225,7 @@
       "name": "Curve.Fi USD Stablecoin",
       "symbol": "crvUSD",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/crvUSD/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "crvusd"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/crvUSD/logo.svg"
     },
     {
       "chainId": 5000,
@@ -276,10 +233,7 @@
       "name": "Custom UPS",
       "symbol": "CUPS",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/CUPS/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/CUPS/logo.svg"
     },
     {
       "chainId": 5000,
@@ -287,13 +241,7 @@
       "name": "DODO bird",
       "symbol": "DODO",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/DODO/logo.png",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "dodo"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/DODO/logo.png"
     },
     {
       "chainId": 5000,
@@ -301,13 +249,7 @@
       "name": "Ember Sword",
       "symbol": "EMBER",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/EMBER/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "ember-sword"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/EMBER/logo.svg"
     },
     {
       "chainId": 5000,
@@ -315,16 +257,7 @@
       "name": "Ethena Token",
       "symbol": "ENA",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/ENA/logo.svg",
-      "extensions": {
-        "thirdparty": {
-          "name": "LayerZero",
-          "url": "https://stargate.finance/transfer"
-        }
-      },
-      "tickers": {
-        "coingecko": "ethena"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/ENA/logo.svg"
     },
     {
       "chainId": 5000,
@@ -332,13 +265,7 @@
       "name": "Equilibria Pendle",
       "symbol": "ePendle",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/ePendle/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "equilibria-finance-ependle"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/ePendle/logo.svg"
     },
     {
       "chainId": 5000,
@@ -346,13 +273,7 @@
       "name": "Equilibria Token",
       "symbol": "EQB",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/EQB/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "equilibria-finance"
-      }
+      "logoURI": "https://token-list.mantle.xyz/data/EQB/logo.svg"
     },
     {
       "chainId": 5000,
@@ -360,13 +281,7 @@
       "name": "Ether",
       "symbol": "ETH",
       "decimals": 18,
-      "logoURI": "https://token-list.mantle.xyz/data/ETH/logo.svg",
-      "extensions": {
-        "optimismBridgeAddress": "0x4200000000000000000000000000000000000010"
-      },
-      "tickers": {
-        "coingecko": "ethereum"
-      }
-    },
+      "logoURI": "https://token-list.mantle.xyz/data/ETH/logo.svg"
+    }
   ]
 }
