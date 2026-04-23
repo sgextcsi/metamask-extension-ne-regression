@@ -7,7 +7,7 @@
 /**
  * Network configuration for swap tests
  */
-export interface NetworkSwapConfig {
+export type NetworkSwapConfig = {
   /** Unique identifier for the network */
   networkId: string;
   /** Display name of the network */
@@ -25,19 +25,67 @@ export interface NetworkSwapConfig {
   /** Optional: ERC-20 token symbols to resolve from tokenlist for execution tests */
   swapExecutionTokenSymbols?: string[];
   /** Optional: Ordered swap routes for execution tests */
-  swapExecutionRoutes?: Array<{ from: string; to: string }>;
+  swapExecutionRoutes?: { from: string; to: string }[];
   /**
    * When true, the "Total gas fee" row on the swap detail page is expected to
    * show "Paid by MetaMask" (green badge). Set for networks where MetaMask
    * sponsors gas (e.g. Monad, SEI). Defaults to false.
    */
   gasFeeSponsoredByProtocol?: boolean;
-}
+};
+
+/**
+ * Parameterized bridge route used by cross-chain execution specs.
+ */
+export type BridgeExecutionRouteConfig = {
+  /** Route label e.g. "MON -> USDC (Monad -> Base)" */
+  label: string;
+  /** Network selected before starting the route */
+  sourceNetworkName: string;
+  /** Expected destination network in bridge details */
+  destinationNetworkName: string;
+  /** Source token symbol */
+  fromSymbol: string;
+  /** Destination token symbol */
+  toSymbol: string;
+  /** Input amount entered into the bridge form */
+  fromAmount: string;
+  /** Token selector input for the bridge destination */
+  destinationTokenAddress: string;
+  /** Accepted activity labels shown for this route */
+  expectedActivityActionLabels: string[];
+  /** Accepted bridge detail statuses */
+  acceptedDetailStatuses?: string[];
+  /** Route must fail instead of auto-reducing when funds are insufficient */
+  hardFailOnInsufficientFunds?: boolean;
+};
+
+/**
+ * Parameterized bridge scenario configuration.
+ */
+export type BridgeExecutionConfig = {
+  /** Unique scenario identifier */
+  scenarioId: string;
+  /** Test title used by bridge execution specs */
+  title: string;
+  /** Network used when the bridge scenario starts */
+  initialNetworkName: string;
+  /** Known destination token contract on the bridge route */
+  baseUsdcAddress: string;
+  /** Convenience symbol values used by the bridge spec */
+  monadNetworkName: string;
+  monSymbol: string;
+  usdcSymbol: string;
+  monToUsdcAmount: string;
+  usdcToMonAmount: string;
+  /** Ordered routes executed by the bridge spec */
+  routes: BridgeExecutionRouteConfig[];
+};
 
 /**
  * Token object structure (matching standard tokenlist format)
  */
-export interface Token {
+export type Token = {
   chainId: number | string;
   address: string;
   name: string;
@@ -45,12 +93,12 @@ export interface Token {
   decimals: number;
   logoURI?: string;
   logoUri?: string;
-}
+};
 
 /**
  * Swap quotation snapshot (values captured before/after token switch)
  */
-export interface QuotationSnapshot {
+export type QuotationSnapshot = {
   fromAmount: string;
   toAmount: string;
   networkFeeSponsored: string;
@@ -58,12 +106,12 @@ export interface QuotationSnapshot {
   priceImpact: string;
   minimumReceived: string;
   capturedAt: string;
-}
+};
 
 /**
  * Token pair quotations for comparison
  */
-export interface TokenPairQuotations {
+export type TokenPairQuotations = {
   sourceToken: Token;
   destinationToken: Token;
   beforeSwitch: QuotationSnapshot;
@@ -72,12 +120,12 @@ export interface TokenPairQuotations {
     expectedTokensSwitch: boolean;
     valuesChanged: boolean;
   };
-}
+};
 
 /**
  * Result of a single token-pair test
  */
-export interface QuotationTestResult {
+export type QuotationTestResult = {
   networkName: string;
   tokenPair: string;
   sourceTokenSymbol: string;
@@ -85,12 +133,12 @@ export interface QuotationTestResult {
   quotations: TokenPairQuotations;
   status: 'passed' | 'failed';
   error?: string;
-}
+};
 
 /**
  * Result of a single swap execution route
  */
-export interface SwapRouteResult {
+export type SwapRouteResult = {
   /** Route label e.g. "MON → AUSD" */
   route: string;
   fromSymbol: string;
@@ -103,24 +151,24 @@ export interface SwapRouteResult {
   validations?: SwapValidationResult[];
   status: 'passed' | 'warning' | 'failed';
   error?: string;
-}
+};
 
 /**
  * Result of an individual validation check within a swap route.
  */
-export interface SwapValidationResult {
+export type SwapValidationResult = {
   /** Human-readable validation name */
   name: string;
   /** Whether the validation passed, failed, or only warned */
   status: 'passed' | 'failed' | 'warning';
   /** Optional diagnostic details (actual value, warning text, etc.) */
   details?: string;
-}
+};
 
 /**
  * Consolidated report for a swap execution test run
  */
-export interface SwapExecutionReport {
+export type SwapExecutionReport = {
   networkName: string;
   chainId: number;
   timestamp: string;
@@ -129,12 +177,12 @@ export interface SwapExecutionReport {
   warningRoutes: number;
   failedRoutes: number;
   routeResults: SwapRouteResult[];
-}
+};
 
 /**
  * Consolidated test results for report generation
  */
-export interface ConsolidatedTestResults {
+export type ConsolidatedTestResults = {
   networkName: string;
   chainId: number;
   tokenlistUrl: string;
@@ -145,7 +193,7 @@ export interface ConsolidatedTestResults {
   passedTestCases: number;
   failedTestCases: number;
   testResults: QuotationTestResult[];
-}
+};
 
 /**
  * Number of tokens to import from tokenlist
@@ -194,6 +242,48 @@ export const SWAP_TEST_NETWORKS: NetworkSwapConfig[] = [
 ];
 
 /**
+ * Shared bridge execution configuration used by dedicated cross-chain specs.
+ */
+export const BRIDGE_TEST_CONFIGS: BridgeExecutionConfig[] = [
+  {
+    scenarioId: 'monad-base-usdc',
+    title: 'Monad MON <-> Base USDC Bridge Execution',
+    initialNetworkName: 'Monad',
+    baseUsdcAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+    monadNetworkName: 'Monad',
+    monSymbol: 'MON',
+    usdcSymbol: 'USDC',
+    monToUsdcAmount: '20',
+    usdcToMonAmount: '0.5',
+    routes: [
+      {
+        label: 'MON -> USDC (Monad -> Base)',
+        sourceNetworkName: 'Monad',
+        destinationNetworkName: 'Base',
+        fromSymbol: 'MON',
+        toSymbol: 'USDC',
+        fromAmount: '20',
+        destinationTokenAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+        expectedActivityActionLabels: ['Swap', 'Bridged to Base'],
+        acceptedDetailStatuses: ['pending', 'confirmed'],
+      },
+      {
+        label: 'USDC -> MON (Base -> Monad)',
+        sourceNetworkName: 'Base',
+        destinationNetworkName: 'Monad',
+        fromSymbol: 'USDC',
+        toSymbol: 'MON',
+        fromAmount: '0.5',
+        destinationTokenAddress: 'MON',
+        expectedActivityActionLabels: ['Swap', 'Bridged to Monad'],
+        acceptedDetailStatuses: ['pending', 'confirmed'],
+        hardFailOnInsufficientFunds: true,
+      },
+    ],
+  },
+];
+
+/**
  * Get network config by network ID
  * @param networkId - The unique identifier for the network
  * @returns The network configuration or undefined if not found
@@ -202,6 +292,18 @@ export function getNetworkSwapConfig(
   networkId: string,
 ): NetworkSwapConfig | undefined {
   return SWAP_TEST_NETWORKS.find((config) => config.networkId === networkId);
+}
+
+/**
+ * Get bridge execution config by scenario ID.
+ *
+ * @param scenarioId - The unique identifier for the bridge scenario.
+ * @returns The bridge execution configuration or undefined if not found.
+ */
+export function getBridgeExecutionConfig(
+  scenarioId: string,
+): BridgeExecutionConfig | undefined {
+  return BRIDGE_TEST_CONFIGS.find((config) => config.scenarioId === scenarioId);
 }
 
 /**

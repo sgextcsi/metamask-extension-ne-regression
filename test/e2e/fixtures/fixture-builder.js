@@ -236,9 +236,29 @@ class FixtureBuilder {
     });
   }
 
+  // withNetworkControllerOnLinea() {
+  //   return this.withNetworkController({
+  //     selectedNetworkClientId: 'linea-mainnet',
+  //   });
+  // }
+
   withNetworkControllerOnLinea() {
     return this.withNetworkController({
       selectedNetworkClientId: 'linea-mainnet',
+      networkConfigurations: {
+        'linea-mainnet': {
+          chainId: CHAIN_IDS.LINEA_MAINNET,
+          nickname: 'Linea',
+          rpcUrl: `https://linea-mainnet.infura.io/v3/${getInfuraProjectId()}`,
+          ticker: 'ETH',
+          rpcPrefs: {
+            blockExplorerUrl: 'https://lineascan.build',
+          },
+          id: 'linea-mainnet',
+          type: 'rpc',
+          isCustom: true,
+        },
+      },
     });
   }
 

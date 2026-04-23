@@ -1,6 +1,7 @@
 const { mockNetworkStateOld } = require('../../stub/networks');
 const { CHAIN_IDS } = require('../../../shared/constants/network');
 const { FirstTimeFlowType } = require('../../../shared/constants/onboarding');
+const { loadE2EEnv } = require('../helpers/e2e-env');
 
 // TODO: Should we bump this?
 // The e2e tests currently configure state in the schema of migration 74.
@@ -10,6 +11,19 @@ const FIXTURE_STATE_METADATA_VERSION = 74;
 
 const E2E_SRP =
   'spread raise short crane omit tent fringe mandate neglect detail suspect cradle';
+
+function getInfuraProjectId() {
+  if (process.env.INFURA_PROJECT_ID) {
+    return process.env.INFURA_PROJECT_ID;
+  }
+
+  const e2eEnv = loadE2EEnv();
+  if (e2eEnv.INFURA_PROJECT_ID) {
+    return e2eEnv.INFURA_PROJECT_ID;
+  }
+
+  return '00000000000000000000000000000000';
+}
 
 function defaultFixture(inputChainId = CHAIN_IDS.LOCALHOST) {
   return {
@@ -94,13 +108,11 @@ function defaultFixture(inputChainId = CHAIN_IDS.LOCALHOST) {
         orderedNetworkList: [
           {
             networkId: '0x1',
-            networkRpcUrl:
-              'https://mainnet.infura.io/v3/00000000000000000000000000000000',
+            networkRpcUrl: `https://mainnet.infura.io/v3/${getInfuraProjectId()}`,
           },
           {
             networkId: '0xe708',
-            networkRpcUrl:
-              'https://linea-mainnet.infura.io/v3/00000000000000000000000000000000',
+            networkRpcUrl: `https://linea-mainnet.infura.io/v3/${getInfuraProjectId()}`,
           },
           {
             networkId: inputChainId,

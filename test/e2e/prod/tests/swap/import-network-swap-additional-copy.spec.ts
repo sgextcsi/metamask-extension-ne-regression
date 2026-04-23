@@ -136,6 +136,55 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
           );
         };
 
+        const dismissUnexpectedBrowserAlertIfPresent =
+          async (): Promise<boolean> => {
+            try {
+              await driver.closeAlertPopup();
+              console.warn(
+                '[TEST] ⚠️  Dismissed unexpected browser auth alert while restoring network scope',
+              );
+              await driver.delay(PROD_DELAYS.API_RESPONSE);
+              return true;
+            } catch (_error) {
+              // No browser alert is currently open.
+              return false;
+            }
+          };
+
+        const applySafeHomeNetworkScope = async (
+          filterNetworkName: string,
+        ): Promise<void> => {
+          const assetListPage = new AssetListPage(driver);
+
+          await dismissUnexpectedBrowserAlertIfPresent();
+
+          try {
+            await assetListPage.selectNetworkFilter(filterNetworkName);
+          } catch (error) {
+            await dismissUnexpectedBrowserAlertIfPresent();
+
+            console.warn(
+              `[TEST] ⚠️  Retrying network filter selection: ${filterNetworkName}`,
+            );
+            try {
+              await assetListPage.selectNetworkFilter(filterNetworkName);
+            } catch (filterError) {
+              console.warn(
+                `[TEST] ⚠️  Network filter selection failed for ${filterNetworkName}. Falling back to active network switch. Error: ${String(filterError)}`,
+              );
+
+              await dismissUnexpectedBrowserAlertIfPresent();
+              await networkManager.openNetworkManager();
+              await networkManager.selectTab('Popular');
+              await networkManager.selectNetworkByNameWithWait(
+                filterNetworkName,
+              );
+              await homePage.checkPageIsLoaded();
+              await driver.delay(PROD_DELAYS.API_RESPONSE);
+            }
+          }
+        };
+
         const submitSwapAndOpenActivityWithMonadFilter = async (
           expectedActions: string[],
           filterNetworkName: string,
@@ -146,8 +195,7 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
 
           // Bridge flows can return to an all-networks token view. Force source
           // network before opening activity so assertions remain scoped.
-          const assetListPage = new AssetListPage(driver);
-          await assetListPage.selectNetworkFilter(filterNetworkName);
+          await applySafeHomeNetworkScope(filterNetworkName);
 
           const activityListPage = new ActivityListPage(driver);
           await activityListPage.openActivityTab();
@@ -318,6 +366,7 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
 
         // After route 1 completes, switch to Base so route 2 sends from USDC on Base.
         console.log('[TEST] Switching active network to Base for route 2...');
+        await dismissUnexpectedBrowserAlertIfPresent();
         await networkManager.openNetworkManager();
         await networkManager.selectTab('Popular');
         await networkManager.selectNetworkByNameWithWait('Base');
