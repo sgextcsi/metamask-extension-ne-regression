@@ -31,11 +31,15 @@ type RuntimeNetworkConfig = NetworkTestConfig & {
 /**
  * Production E2E Test: Custom Networks, Import Account, and Send
  * This test is parameterized to run against multiple custom networks.
- * Network configurations are loaded from fixtures/all-networks.json (customNetworks section)
+ * Network configurations are loaded from fixtures/network-config.ts (customNetworks section)
  *
  * To add a new custom network:
- * 1. Add network details to fixtures/all-networks.json under "customNetworks"
+ * 1. Add network details to fixtures/network-config.ts under "customNetworks"
  * 2. Test will automatically run for that network
+ *
+ * To run selected networks only:
+ * 1. Pass a comma-separated NETWORK env value in the command
+ * 2. Example: NETWORK=chiliz,bob SELENIUM_BROWSER=chrome yarn test:e2e:single test/e2e/prod/tests/send/import-network-send-custom-parameterized.spec.ts -- --browser chrome
  *
  * To exclude a network from testing:
  * 1. Modify getCustomNetworksForTesting() call below
@@ -43,7 +47,7 @@ type RuntimeNetworkConfig = NetworkTestConfig & {
  */
 describe('Production E2E: Custom Networks, Import Account and Send (Parameterized)', function (this: Suite) {
   // Get all custom networks to test from configuration
-  const networks = getCustomNetworksForTesting();
+  const networks = getNetworksForCurrentRun();
   const allNetworkResults: SendTransactionResult[] = [];
 
   // Run test for each network
@@ -747,4 +751,45 @@ async function runNetworkSendTest(
     reporter.markAsFailed(String(error));
     return reporter.getCurrentResult();
   }
+}
+
+function getNetworksForCurrentRun(): NetworkTestConfig[] {
+  const configuredNetworks = getCustomNetworksForTesting();
+  const selectedNetworks = getSelectedNetworksFromEnv();
+
+  if (selectedNetworks.length === 0) {
+    return configuredNetworks;
+  }
+
+  const selectedSet = new Set(selectedNetworks);
+  const filteredNetworks = configuredNetworks.filter((network) => {
+    const id = network.id.toLowerCase();
+    const name = network.networkName.toLowerCase();
+    return selectedSet.has(id) || selectedSet.has(name);
+  });
+
+  if (filteredNetworks.length === 0) {
+    const availableIds = configuredNetworks
+      .map((network) => network.id)
+      .join(', ');
+
+    throw new Error(
+      `No custom networks matched NETWORK=${process.env.NETWORK}. Available ids: ${availableIds}`,
+    );
+  }
+
+  return filteredNetworks;
+}
+
+function getSelectedNetworksFromEnv(): string[] {
+  const networkEnv = process.env.NETWORK;
+
+  if (!networkEnv) {
+    return [];
+  }
+
+  return networkEnv
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
 }
