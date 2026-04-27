@@ -858,3 +858,158 @@ export function generateSwapExecutionReport(
   fs.writeFileSync(reportPath, md, 'utf-8');
   console.log(`[EXEC] Swap execution report written to: ${reportPath}`);
 }
+
+// ---------------------------------------------------------------------------
+// Bridge report generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a markdown execution report for cross-chain bridge tests, writing
+ * it to the swap test folder and removing any stale previous report files.
+ *
+ * @param results - Per-route results collected during the bridge test run
+ * @param options - Metadata used in the report header
+ * @param options.title - Human-readable title for the bridge scenario
+ * @param options.sourceNetwork - Name of the source network (e.g. 'Monad')
+ * @param options.destinationNetwork - Name of the destination network (e.g. 'Base')
+ */
+export function generateBridgeExecutionReport(
+  results: SwapRouteResult[],
+  options: {
+    title: string;
+    sourceNetwork: string;
+    destinationNetwork: string;
+  },
+): void {
+  const reportDir = path.join(
+    process.cwd(),
+    'test',
+    'e2e',
+    'prod',
+    'tests',
+    'swap',
+  );
+  const reportFileName = 'bridge-execution-report.md';
+  const reportPath = path.join(reportDir, reportFileName);
+
+  // Remove any stale bridge execution reports
+  try {
+    const existingFiles = fs.readdirSync(reportDir);
+    const stale = existingFiles.filter(
+      (f) => f.startsWith('bridge-execution-report') && f.endsWith('.md'),
+    );
+    stale.forEach((f) => {
+      try {
+        fs.unlinkSync(path.join(reportDir, f));
+      } catch (_e) {
+        // best-effort
+      }
+    });
+  } catch (_e) {
+    // directory may not exist yet
+  }
+
+  try {
+    fs.mkdirSync(reportDir, { recursive: true });
+  } catch (_e) {
+    // already exists
+  }
+
+  const passed = results.filter((r) => r.status === 'passed').length;
+  const warnings = results.filter((r) => r.status === 'warning').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+  const timestamp = new Date().toISOString();
+  const allValidations: SwapValidationResult[] = results.flatMap(
+    (r) => r.validations ?? [],
+  );
+  const passedValidations = allValidations.filter(
+    (v) => v.status === 'passed',
+  ).length;
+  const warningValidations = allValidations.filter(
+    (v) => v.status === 'warning',
+  ).length;
+  const failedValidations = allValidations.filter(
+    (v) => v.status === 'failed',
+  ).length;
+
+  let md = `# Bridge Execution Report\n\n`;
+  md += `**Title:** ${options.title}\n`;
+  md += `**Source Network:** ${options.sourceNetwork}\n`;
+  md += `**Destination Network:** ${options.destinationNetwork}\n`;
+  md += `**Generated:** ${new Date(timestamp).toLocaleString()}\n\n`;
+  md += `---\n\n`;
+
+  md += `## Summary\n\n`;
+  md += `| Metric | Value |\n`;
+  md += `|--------|-------|\n`;
+  md += `| Total Routes | ${results.length} |\n`;
+  md += `| ✅ Passed | ${passed} |\n`;
+  md += `| ⚠️ Warning | ${warnings} |\n`;
+  md += `| ❌ Failed | ${failed} |\n\n`;
+
+  md += `## Validation Coverage\n\n`;
+  md += `| Metric | Value |\n`;
+  md += `|--------|-------|\n`;
+  md += `| Total Validations | ${allValidations.length} |\n`;
+  md += `| ✅ Passed Validations | ${passedValidations} |\n`;
+  md += `| ⚠️ Warning Validations | ${warningValidations} |\n`;
+  md += `| ❌ Failed Validations | ${failedValidations} |\n\n`;
+
+  md += `### What Was Validated\n\n`;
+  md += `- Bridge quote became ready before submission\n`;
+  md += `- CTA fee text was present and parsed\n`;
+  md += `- Activity row primary amount matched expected source token\n`;
+  md += `- Activity row secondary value showed a negative fiat amount\n`;
+  md += `- Bridge detail status was pending or confirmed\n`;
+  md += `- Time stamp row existed on the detail page\n`;
+  md += `- You sent row matched captured source amount\n`;
+  md += `- You received row matched captured destination amount at 2 decimals and warns on mismatch\n`;
+  md += `- Total gas fee row was present and non-empty\n\n`;
+
+  md += `---\n\n`;
+  md += `## Route Results\n\n`;
+  md += `| # | Route | From Amount | To Amount | Status | Validations | Notes |\n`;
+  md += `|---|-------|-------------|-----------|--------|-------------|-------|\n`;
+
+  results.forEach((r, i) => {
+    let statusIcon = '❌';
+    if (r.status === 'passed') {
+      statusIcon = '✅';
+    } else if (r.status === 'warning') {
+      statusIcon = '⚠️';
+    }
+    const validationSummary = `${(r.validations ?? []).filter((v) => v.status === 'passed').length}✅ ${(r.validations ?? []).filter((v) => v.status === 'warning').length}⚠️ ${(r.validations ?? []).filter((v) => v.status === 'failed').length}❌`;
+    const notes = r.error
+      ? r.error.replace(/\|/gu, '\\|').substring(0, 80)
+      : '';
+    md += `| ${i + 1} | ${r.route} | ${r.fromAmount} | ${r.toAmount} | ${statusIcon} | ${validationSummary} | ${notes} |\n`;
+  });
+
+  md += `\n`;
+
+  md += `## Route Validation Details\n\n`;
+  results.forEach((routeResult, index) => {
+    md += `### ${index + 1}. ${routeResult.route}\n\n`;
+    if (!routeResult.validations || routeResult.validations.length === 0) {
+      md += `No validation records captured for this route.\n\n`;
+      return;
+    }
+
+    md += `| Validation | Status | Details |\n`;
+    md += `|------------|--------|---------|\n`;
+    routeResult.validations.forEach((validation) => {
+      let statusIcon = '❌ Failed';
+      if (validation.status === 'passed') {
+        statusIcon = '✅ Passed';
+      } else if (validation.status === 'warning') {
+        statusIcon = '⚠️ Warning';
+      }
+      const details = (validation.details ?? '').replace(/\|/gu, '\\|');
+      md += `| ${validation.name} | ${statusIcon} | ${details} |\n`;
+    });
+    md += `\n`;
+  });
+
+  fs.writeFileSync(reportPath, md, 'utf-8');
+  console.log(`[EXEC] Bridge execution report written to: ${reportPath}`);
+}
