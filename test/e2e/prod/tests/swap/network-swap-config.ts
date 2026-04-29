@@ -4,6 +4,8 @@
  * Defines which networks support swap testing and tokens to import
  */
 
+import FixtureBuilder from '../../../fixtures/fixture-builder';
+
 /**
  * Network configuration for swap tests
  */
@@ -80,6 +82,20 @@ export type BridgeExecutionConfig = {
   usdcToMonAmount: string;
   /** Ordered routes executed by the bridge spec */
   routes: BridgeExecutionRouteConfig[];
+};
+
+/**
+ * Generic bridge scenario constants used by prod bridge execution specs.
+ */
+export type BridgeScenarioConstants = {
+  scenarioId: string;
+  primaryNetworkName: string;
+  secondaryNetworkName: string;
+  sourceTokenSymbol: string;
+  destinationTokenSymbol: string;
+  sourceToDestinationAmount: string;
+  destinationToSourceAmount: string;
+  destinationTokenAddress: string;
 };
 
 /**
@@ -206,6 +222,42 @@ export const TOKENS_TO_IMPORT = 3;
 export const DEFAULT_SWAP_AMOUNT = 20;
 
 /**
+ * Default Monad/Base bridge scenario values.
+ */
+export const MONAD_BASE_BRIDGE_SCENARIO: BridgeScenarioConstants = {
+  scenarioId: 'monad-base-usdc',
+  primaryNetworkName: 'Monad',
+  secondaryNetworkName: 'Base',
+  sourceTokenSymbol: 'MON',
+  destinationTokenSymbol: 'USDC',
+  sourceToDestinationAmount: '20',
+  destinationToSourceAmount: '0.5',
+  destinationTokenAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+};
+
+/**
+ * Build the standard bridge fixture with Base and Monad network controllers.
+ */
+export function buildBaseMonadBridgeFixture() {
+  const fixtureBuilder = new FixtureBuilder();
+  return fixtureBuilder
+    .withNetworkControllerOnBase()
+    .withNetworkControllerOnMonad()
+    .build();
+}
+
+// Backward-compatible aliases retained for existing specs.
+export const BASE_USDC_ADDRESS =
+  MONAD_BASE_BRIDGE_SCENARIO.destinationTokenAddress;
+export const MONAD_NETWORK_NAME = MONAD_BASE_BRIDGE_SCENARIO.primaryNetworkName;
+export const MON_SYMBOL = MONAD_BASE_BRIDGE_SCENARIO.sourceTokenSymbol;
+export const USDC_SYMBOL = MONAD_BASE_BRIDGE_SCENARIO.destinationTokenSymbol;
+export const MON_TO_USDC_AMOUNT =
+  MONAD_BASE_BRIDGE_SCENARIO.sourceToDestinationAmount;
+export const USDC_TO_MON_AMOUNT =
+  MONAD_BASE_BRIDGE_SCENARIO.destinationToSourceAmount;
+
+/**
  * Network configurations for swap quotation tests
  * Add new networks here to support them in tests
  */
@@ -246,35 +298,36 @@ export const SWAP_TEST_NETWORKS: NetworkSwapConfig[] = [
  */
 export const BRIDGE_TEST_CONFIGS: BridgeExecutionConfig[] = [
   {
-    scenarioId: 'monad-base-usdc',
+    scenarioId: MONAD_BASE_BRIDGE_SCENARIO.scenarioId,
     title: 'Monad MON <-> Base USDC Bridge Execution',
-    initialNetworkName: 'Monad',
-    baseUsdcAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-    monadNetworkName: 'Monad',
-    monSymbol: 'MON',
-    usdcSymbol: 'USDC',
-    monToUsdcAmount: '20',
-    usdcToMonAmount: '0.5',
+    initialNetworkName: MONAD_BASE_BRIDGE_SCENARIO.primaryNetworkName,
+    baseUsdcAddress: MONAD_BASE_BRIDGE_SCENARIO.destinationTokenAddress,
+    monadNetworkName: MONAD_BASE_BRIDGE_SCENARIO.primaryNetworkName,
+    monSymbol: MONAD_BASE_BRIDGE_SCENARIO.sourceTokenSymbol,
+    usdcSymbol: MONAD_BASE_BRIDGE_SCENARIO.destinationTokenSymbol,
+    monToUsdcAmount: MONAD_BASE_BRIDGE_SCENARIO.sourceToDestinationAmount,
+    usdcToMonAmount: MONAD_BASE_BRIDGE_SCENARIO.destinationToSourceAmount,
     routes: [
       {
         label: 'MON -> USDC (Monad -> Base)',
-        sourceNetworkName: 'Monad',
-        destinationNetworkName: 'Base',
-        fromSymbol: 'MON',
-        toSymbol: 'USDC',
-        fromAmount: '20',
-        destinationTokenAddress: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+        sourceNetworkName: MONAD_BASE_BRIDGE_SCENARIO.primaryNetworkName,
+        destinationNetworkName: MONAD_BASE_BRIDGE_SCENARIO.secondaryNetworkName,
+        fromSymbol: MONAD_BASE_BRIDGE_SCENARIO.sourceTokenSymbol,
+        toSymbol: MONAD_BASE_BRIDGE_SCENARIO.destinationTokenSymbol,
+        fromAmount: MONAD_BASE_BRIDGE_SCENARIO.sourceToDestinationAmount,
+        destinationTokenAddress:
+          MONAD_BASE_BRIDGE_SCENARIO.destinationTokenAddress,
         expectedActivityActionLabels: ['Swap', 'Bridged to Base'],
         acceptedDetailStatuses: ['pending', 'confirmed'],
       },
       {
         label: 'USDC -> MON (Base -> Monad)',
-        sourceNetworkName: 'Base',
-        destinationNetworkName: 'Monad',
-        fromSymbol: 'USDC',
-        toSymbol: 'MON',
-        fromAmount: '0.5',
-        destinationTokenAddress: 'MON',
+        sourceNetworkName: MONAD_BASE_BRIDGE_SCENARIO.secondaryNetworkName,
+        destinationNetworkName: MONAD_BASE_BRIDGE_SCENARIO.primaryNetworkName,
+        fromSymbol: MONAD_BASE_BRIDGE_SCENARIO.destinationTokenSymbol,
+        toSymbol: MONAD_BASE_BRIDGE_SCENARIO.sourceTokenSymbol,
+        fromAmount: MONAD_BASE_BRIDGE_SCENARIO.destinationToSourceAmount,
+        destinationTokenAddress: MONAD_BASE_BRIDGE_SCENARIO.sourceTokenSymbol,
         expectedActivityActionLabels: ['Swap', 'Bridged to Monad'],
         acceptedDetailStatuses: ['pending', 'confirmed'],
         hardFailOnInsufficientFunds: true,

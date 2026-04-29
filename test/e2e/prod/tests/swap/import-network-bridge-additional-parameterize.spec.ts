@@ -1,15 +1,13 @@
 /**
- * Production E2E Test: Monad MON <-> USDC Swap Execution
+ * Production E2E Test: Parameterized bridge execution with account creation.
  *
- * Executes two live swaps in sequence and validates activity + detail rows:
- * 1) MON -> USDC (Base USDC address)
- * 2) USDC -> MON (fixed 0.5 USDC)
- *
- * No tokenlist fetch/import is used in this test.
- *
- * Prerequisites:
- * - PRIVATE_KEY_TO in .env.e2e (funded account with Monad-native MON)
- * - Real network connectivity to Monad RPC
+ * Workflow:
+ * 1) Create a new multichain account from home
+ * 2) Import account (PRIVATE_KEY_TO)
+ * 3) Execute MON -> USDC bridge route from imported account
+ * 4) Transfer USDC to the newly-created account on Base
+ * 5) Execute USDC -> MON bridge route from created account
+ * 6) Attempt final return send to imported account on Monad using destination token
  */
 
 import { Suite } from 'mocha';
@@ -19,6 +17,9 @@ import { loginWithoutBalanceValidation } from '../../../page-objects/flows/login
 import HomePage from '../../../page-objects/pages/home/homepage';
 import AssetListPage from '../../../page-objects/pages/home/asset-list';
 import ActivityListPage from '../../../page-objects/pages/home/activity-list';
+import AccountListPage from '../../../page-objects/pages/account-list-page';
+import SendPage from '../../../page-objects/pages/send/send-page';
+import SendTokenConfirmPage from '../../../page-objects/pages/confirmations/token-transfer-confirmation';
 import NetworkManager from '../../../page-objects/pages/network-manager';
 import { Driver } from '../../../webdriver/driver';
 import { getRequiredE2EEnv } from '../../../helpers/e2e-env';
@@ -31,7 +32,6 @@ import {
 } from './network-swap-config';
 import { performSwapFlow } from './swap-quotation-helpers';
 import {
-  importSingleFundedAccount,
   waitForSwapQuoteReady,
   assertCtaFeeText,
   captureSwapAmounts,
@@ -47,33 +47,31 @@ import {
   generateBridgeExecutionReport,
 } from './swap-execution-helpers';
 
+const MONAD_CHAIN_ID_HEX = '0x8f';
+const BASE_CHAIN_ID_HEX = '0x2105';
+const IMPORTED_ACCOUNT_NAME = 'Imported Account 1';
+const CREATED_ACCOUNT_NAME = 'Account 2';
+const TRANSFER_TO_CREATED_USDC_AMOUNT = '1';
+const FINAL_RETURN_TO_IMPORTED_AMOUNT = '0.1';
+
 /**
- * Production E2E Test: Monad MON <-> USDC simple execution.
+ * Production E2E Test: Monad/Base bridge with explicit account management flow.
  */
-describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Suite) {
+describe('Production E2E: Parameterized bridge with created account', function (this: Suite) {
   this.timeout(900000);
 
-  it('executes MON -> USDC then USDC -> MON with fixed 0.5 USDC', async function () {
-    const BASE_USDC_ADDRESS =
-      MONAD_BASE_BRIDGE_SCENARIO.destinationTokenAddress;
-    const MONAD_NETWORK_NAME = MONAD_BASE_BRIDGE_SCENARIO.primaryNetworkName;
-    const MON_SYMBOL = MONAD_BASE_BRIDGE_SCENARIO.sourceTokenSymbol;
-    const USDC_SYMBOL = MONAD_BASE_BRIDGE_SCENARIO.destinationTokenSymbol;
-    const MON_TO_USDC_AMOUNT =
-      MONAD_BASE_BRIDGE_SCENARIO.sourceToDestinationAmount;
-    const USDC_TO_MON_AMOUNT =
-      MONAD_BASE_BRIDGE_SCENARIO.destinationToSourceAmount;
+  it('creates account, bridges on imported account, then bridges on created account', async function () {
+    const scenario = MONAD_BASE_BRIDGE_SCENARIO;
 
-    // Collect per-route results for the final markdown bridge report
     const routeResults: SwapRouteResult[] = [];
 
     const networkConfig = SWAP_TEST_NETWORKS.find(
-      ({ networkName }) => networkName === MONAD_NETWORK_NAME,
+      ({ networkName }) => networkName === scenario.primaryNetworkName,
     );
 
     if (!networkConfig) {
       throw new Error(
-        `[TEST] Missing network config for ${MONAD_NETWORK_NAME}`,
+        `[TEST] Missing network config for ${scenario.primaryNetworkName}`,
       );
     }
 
@@ -82,39 +80,88 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
         fixtures: buildBaseMonadBridgeFixture(),
         title:
           this.test?.fullTitle() ||
-          `Swap execution test for ${MONAD_NETWORK_NAME}`,
+          `Parameterized bridge execution test for ${scenario.primaryNetworkName}`,
         extendedTimeoutMultiplier: 2,
       },
       async ({ driver }: { driver: Driver }) => {
         console.log(`\n${'='.repeat(80)}`);
         console.log(
-          `[TEST] Starting MON <-> USDC swap execution on ${MONAD_NETWORK_NAME}`,
+          `[TEST] Starting parameterized bridge flow on ${scenario.primaryNetworkName}`,
         );
         console.log(`${'='.repeat(80)}\n`);
 
-        console.log(`[TEST] Logging in to wallet...`);
-        await loginWithoutBalanceValidation(driver);
         const homePage = new HomePage(driver);
-        await homePage.checkPageIsLoaded();
-        await driver.delay(PROD_DELAYS.API_RESPONSE);
-        console.log(`[TEST] ✅ Logged in`);
-
-        console.log(`[TEST] Selecting ${MONAD_NETWORK_NAME} network...`);
         const networkManager = new NetworkManager(driver);
-        await networkManager.openNetworkManager();
-        await networkManager.selectTab('Popular');
-        await networkManager.selectNetworkByNameWithWait(MONAD_NETWORK_NAME);
-        await homePage.checkPageIsLoaded();
-        await driver.delay(PROD_DELAYS.API_RESPONSE);
-        console.log(`[TEST] ✅ Network selected: ${MONAD_NETWORK_NAME}`);
-
-        console.log(`[TEST] Importing funded account (PRIVATE_KEY_FROM)...`);
-        const privateKeyFrom = getRequiredE2EEnv('PRIVATE_KEY_FROM');
-        await importSingleFundedAccount(driver, privateKeyFrom);
-        console.log(`[TEST] ✅ Funded account imported and active`);
 
         const normalizeText = (value: string) =>
           value.replace(/\s+/gu, ' ').trim().toUpperCase();
+
+        const dismissUnexpectedBrowserAlertIfPresent =
+          async (): Promise<boolean> => {
+            try {
+              await driver.closeAlertPopup();
+              console.warn(
+                '[TEST] ⚠️  Dismissed unexpected browser auth alert while restoring network scope',
+              );
+              await driver.delay(PROD_DELAYS.API_RESPONSE);
+              return true;
+            } catch (_error) {
+              return false;
+            }
+          };
+
+        const selectNetwork = async (networkName: string): Promise<void> => {
+          await dismissUnexpectedBrowserAlertIfPresent();
+          await networkManager.openNetworkManager();
+          await networkManager.selectTab('Popular');
+          await networkManager.selectNetworkByNameWithWait(networkName);
+          await homePage.checkPageIsLoaded();
+          await driver.delay(PROD_DELAYS.API_RESPONSE);
+          console.log(`[TEST] ✅ Network selected: ${networkName}`);
+        };
+
+        const switchToAccount = async (accountName: string): Promise<void> => {
+          await homePage.headerNavbar.openAccountMenu();
+          const accountListPage = new AccountListPage(driver);
+          await accountListPage.checkPageIsLoaded();
+          await accountListPage.selectAccount(accountName);
+          await homePage.checkPageIsLoaded();
+          await driver.delay(PROD_DELAYS.API_RESPONSE);
+          console.log(`[TEST] ✅ Active account: ${accountName}`);
+        };
+
+        const createAndSwitchToNewAccount = async (): Promise<string> => {
+          await homePage.headerNavbar.openAccountMenu();
+          const accountListPage = new AccountListPage(driver);
+          await accountListPage.checkPageIsLoaded();
+          await accountListPage.addMultichainAccount();
+          await accountListPage.checkAccountDisplayedInAccountList(
+            CREATED_ACCOUNT_NAME,
+          );
+          await accountListPage.selectAccount(CREATED_ACCOUNT_NAME);
+          await homePage.checkPageIsLoaded();
+          await driver.delay(PROD_DELAYS.API_RESPONSE);
+          console.log(`[TEST] ✅ Created account: ${CREATED_ACCOUNT_NAME}`);
+          return CREATED_ACCOUNT_NAME;
+        };
+
+        const importAccountOneAndSwitch = async (
+          privateKey: string,
+        ): Promise<string> => {
+          await homePage.headerNavbar.openAccountMenu();
+          const accountListPage = new AccountListPage(driver);
+          await accountListPage.checkPageIsLoaded();
+          await accountListPage.addNewImportedAccount(privateKey, undefined, {
+            isMultichainAccountsState2Enabled: true,
+          });
+          await accountListPage.selectAccount(IMPORTED_ACCOUNT_NAME);
+          await homePage.checkPageIsLoaded();
+          await driver.delay(PROD_DELAYS.API_RESPONSE);
+          console.log(
+            `[TEST] ✅ Imported account active: ${IMPORTED_ACCOUNT_NAME}`,
+          );
+          return IMPORTED_ACCOUNT_NAME;
+        };
 
         const assertLatestActivityActionOneOf = async (
           expectedActions: string[],
@@ -145,21 +192,6 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
           );
         };
 
-        const dismissUnexpectedBrowserAlertIfPresent =
-          async (): Promise<boolean> => {
-            try {
-              await driver.closeAlertPopup();
-              console.warn(
-                '[TEST] ⚠️  Dismissed unexpected browser auth alert while restoring network scope',
-              );
-              await driver.delay(PROD_DELAYS.API_RESPONSE);
-              return true;
-            } catch (_error) {
-              // No browser alert is currently open.
-              return false;
-            }
-          };
-
         const applySafeHomeNetworkScope = async (
           filterNetworkName: string,
         ): Promise<void> => {
@@ -169,41 +201,19 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
 
           try {
             await assetListPage.selectNetworkFilter(filterNetworkName);
-          } catch (error) {
+          } catch (_error) {
             await dismissUnexpectedBrowserAlertIfPresent();
-
-            console.warn(
-              `[TEST] ⚠️  Retrying network filter selection: ${filterNetworkName}`,
-            );
-            try {
-              await assetListPage.selectNetworkFilter(filterNetworkName);
-            } catch (filterError) {
-              console.warn(
-                `[TEST] ⚠️  Network filter selection failed for ${filterNetworkName}. Falling back to active network switch. Error: ${String(filterError)}`,
-              );
-
-              await dismissUnexpectedBrowserAlertIfPresent();
-              await networkManager.openNetworkManager();
-              await networkManager.selectTab('Popular');
-              await networkManager.selectNetworkByNameWithWait(
-                filterNetworkName,
-              );
-              await homePage.checkPageIsLoaded();
-              await driver.delay(PROD_DELAYS.API_RESPONSE);
-            }
+            await selectNetwork(filterNetworkName);
           }
         };
 
-        const submitSwapAndOpenActivityWithMonadFilter = async (
+        const submitSwapAndOpenActivityWithNetworkFilter = async (
           expectedActions: string[],
           filterNetworkName: string,
         ): Promise<void> => {
           await driver.clickElement('[data-testid="bridge-cta-button"]');
           await driver.delay(PROD_DELAYS.API_RESPONSE * 2);
           await recoverToHome(driver);
-
-          // Bridge flows can return to an all-networks token view. Force source
-          // network before opening activity so assertions remain scoped.
           await applySafeHomeNetworkScope(filterNetworkName);
 
           const activityListPage = new ActivityListPage(driver);
@@ -321,7 +331,7 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
             routeResult.fromAmount = capturedFromAmount;
             routeResult.toAmount = toAmount;
 
-            await submitSwapAndOpenActivityWithMonadFilter(
+            await submitSwapAndOpenActivityWithNetworkFilter(
               expectedActivityActionLabels,
               sourceNetworkName,
             );
@@ -340,7 +350,6 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
 
             await openLatestActivityRecord();
 
-            // Bridge detail status: accept 'pending' or 'confirmed'
             try {
               await assertSwapDetailStatusAccepted();
               recordValidation(
@@ -362,11 +371,6 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
               timestampResult.isValid ? 'passed' : 'warning',
               timestampResult.message,
             );
-            if (!timestampResult.isValid) {
-              console.warn(
-                `[TEST] ⚠️  ALERT: Time stamp row validation warning: ${timestampResult.message}`,
-              );
-            }
 
             try {
               await assertDetailRow(
@@ -381,9 +385,6 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
               );
             } catch (error) {
               recordValidation('You sent row', 'warning', String(error));
-              console.warn(
-                `[TEST] ⚠️  ALERT: You sent row validation warning: ${String(error)}`,
-              );
             }
 
             const receivedRowResult = await validateDetailRowAmountAtPrecision(
@@ -396,11 +397,6 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
               receivedRowResult.isValid ? 'passed' : 'warning',
               receivedRowResult.message,
             );
-            if (!receivedRowResult.isValid) {
-              console.warn(
-                `[TEST] ⚠️  ALERT: You received row validation warning: ${receivedRowResult.message}`,
-              );
-            }
 
             const totalGasFeeResult = await assertTotalGasFeeRow(
               driver,
@@ -411,11 +407,6 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
               totalGasFeeResult.isValid ? 'passed' : 'warning',
               totalGasFeeResult.message,
             );
-            if (!totalGasFeeResult.isValid) {
-              console.warn(
-                `[TEST] ⚠️  ALERT: Total gas fee row validation warning: ${totalGasFeeResult.message}`,
-              );
-            }
 
             await navigateBackToHome(driver);
             routeResult.status = 'passed';
@@ -434,41 +425,97 @@ describe('Production E2E: Monad MON <-> USDC Swap Execution', function (this: Su
           }
         };
 
-        try {
-          await executeAndValidateSwap({
-            fromSymbol: MON_SYMBOL,
-            toSymbol: USDC_SYMBOL,
-            destinationTokenAddress: BASE_USDC_ADDRESS,
-            fromAmount: MON_TO_USDC_AMOUNT,
-            expectedActivityActionLabels: ['Swap', 'Bridged to Base'],
-            sourceNetworkName: MONAD_NETWORK_NAME,
+        const sendTokenToAccount = async ({
+          chainIdHex,
+          symbol,
+          amount,
+          recipientAccountName,
+        }: {
+          chainIdHex: string;
+          symbol: string;
+          amount: string;
+          recipientAccountName: string;
+        }): Promise<void> => {
+          await homePage.startSendFlow();
+          const sendPage = new SendPage(driver);
+          await sendPage.checkPageIsLoaded();
+          await sendPage.createSendRequest({
+            chainId: chainIdHex,
+            symbol,
+            recipientName: recipientAccountName,
+            amount,
           });
 
-          // After route 1 completes, switch to Base so route 2 sends from USDC on Base.
-          console.log('[TEST] Switching active network to Base for route 2...');
-          await dismissUnexpectedBrowserAlertIfPresent();
-          await networkManager.openNetworkManager();
-          await networkManager.selectTab('Popular');
-          await networkManager.selectNetworkByNameWithWait('Base');
+          const sendTokenConfirmPage = new SendTokenConfirmPage(driver);
+          await sendTokenConfirmPage.checkPageIsLoaded();
+          await sendTokenConfirmPage.clickConfirmButton();
+          await driver.delay(PROD_DELAYS.RPC_RESPONSE);
+          await recoverToHome(driver);
+          console.log(
+            `[TEST] ✅ Sent ${amount} ${symbol} to ${recipientAccountName}`,
+          );
+        };
+
+        try {
+          console.log('[TEST] Logging in to wallet...');
+          await loginWithoutBalanceValidation(driver);
           await homePage.checkPageIsLoaded();
           await driver.delay(PROD_DELAYS.API_RESPONSE);
-          console.log('[TEST] ✅ Network selected: Base');
+          console.log('[TEST] ✅ Logged in');
+
+          await selectNetwork(scenario.primaryNetworkName);
+
+          await createAndSwitchToNewAccount();
+
+          const privateKeyTo = getRequiredE2EEnv('PRIVATE_KEY_TO');
+          await importAccountOneAndSwitch(privateKeyTo);
 
           await executeAndValidateSwap({
-            fromSymbol: USDC_SYMBOL,
-            toSymbol: MON_SYMBOL,
-            destinationTokenAddress: MON_SYMBOL,
-            fromAmount: USDC_TO_MON_AMOUNT,
+            fromSymbol: scenario.sourceTokenSymbol,
+            toSymbol: scenario.destinationTokenSymbol,
+            destinationTokenAddress: scenario.destinationTokenAddress,
+            fromAmount: scenario.sourceToDestinationAmount,
+            expectedActivityActionLabels: ['Swap', 'Bridged to Base'],
+            sourceNetworkName: scenario.primaryNetworkName,
+          });
+
+          await selectNetwork(scenario.secondaryNetworkName);
+
+          await sendTokenToAccount({
+            chainIdHex: BASE_CHAIN_ID_HEX,
+            symbol: scenario.destinationTokenSymbol,
+            amount: TRANSFER_TO_CREATED_USDC_AMOUNT,
+            recipientAccountName: CREATED_ACCOUNT_NAME,
+          });
+
+          await switchToAccount(CREATED_ACCOUNT_NAME);
+          await selectNetwork(scenario.secondaryNetworkName);
+
+          await executeAndValidateSwap({
+            fromSymbol: scenario.destinationTokenSymbol,
+            toSymbol: scenario.sourceTokenSymbol,
+            destinationTokenAddress: scenario.sourceTokenSymbol,
+            fromAmount: scenario.destinationToSourceAmount,
             expectedActivityActionLabels: ['Swap', 'Bridged to Monad'],
-            sourceNetworkName: 'Base',
+            sourceNetworkName: scenario.secondaryNetworkName,
+          });
+
+          await selectNetwork(scenario.primaryNetworkName);
+
+          // Final transfer step requested: from created account to imported account.
+          await sendTokenToAccount({
+            chainIdHex: MONAD_CHAIN_ID_HEX,
+            symbol: scenario.destinationTokenSymbol,
+            amount: FINAL_RETURN_TO_IMPORTED_AMOUNT,
+            recipientAccountName: IMPORTED_ACCOUNT_NAME,
           });
         } finally {
-          // Generate the bridge execution report regardless of pass/fail
           try {
             generateBridgeExecutionReport(routeResults, {
-              title: 'Monad MON <-> Base USDC Bridge Execution',
-              sourceNetwork: MONAD_NETWORK_NAME,
-              destinationNetwork: 'Base',
+              title:
+                'Monad/Base parameterized bridge execution with account creation',
+              sourceNetwork: scenario.primaryNetworkName,
+              destinationNetwork: scenario.secondaryNetworkName,
             });
           } catch (reportError) {
             console.warn(
