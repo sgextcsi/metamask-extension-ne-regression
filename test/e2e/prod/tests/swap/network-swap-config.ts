@@ -160,6 +160,7 @@ export const DEFAULT_SWAP_AMOUNT = 20;
 /**
  * Network configurations for swap quotation tests
  * Add new networks here to support them in tests
+ * Current default configured swap execution network: Monad.
  */
 export const SWAP_TEST_NETWORKS: NetworkSwapConfig[] = [
   {

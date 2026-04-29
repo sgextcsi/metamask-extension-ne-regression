@@ -60,6 +60,7 @@ import {
  *
  * Configuration is driven by SWAP_TEST_NETWORKS — only networks with
  * `swapExecutionRoutes` defined will run. Currently: Monad only.
+ * Default execution target in this file is currently Monad.
  */
 describe('Production E2E: Network Swap Execution', function (this: Suite) {
   this.timeout(900000); // 15 minutes total for all routes
