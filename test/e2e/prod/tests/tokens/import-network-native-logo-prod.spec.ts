@@ -598,7 +598,7 @@ async function runNetworkImportNativeValidationTest(
 
 
         await addEditNetworkModal.saveEditedNetwork();
-
+        await addEditNetworkModal.clickBackButton();
 
         await homePage.checkPageIsLoaded();
         await homePage.checkAddNetworkMessageIsDisplayed(
