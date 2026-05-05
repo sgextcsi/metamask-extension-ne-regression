@@ -161,11 +161,9 @@ describe('Bridge functionality', function (this: Suite) {
         await homePage.startSwapFlow();
 
         const bridgePage = await enterBridgeQuote(driver);
-
         await bridgePage.submitQuote();
         await bridgePage.approveModalIfPresent();
         await driver.clickElement({ text: 'View activity' });
-
         const activityList = new ActivityListPage(driver);
         await activityList.checkPendingBridgeTransactionActivity();
         await activityList.checkBridgeTransactionDetails(
@@ -204,6 +202,7 @@ describe('Bridge functionality', function (this: Suite) {
         await homePage.startSwapFlow();
 
         const bridgePage = await enterBridgeQuote(driver);
+        await bridgePage.submitQuote();
         await bridgePage.submitQuoteAndDismiss();
         await homePage.goToActivityList();
 
@@ -245,6 +244,7 @@ describe('Bridge functionality', function (this: Suite) {
         await homePage.startSwapFlow();
 
         const bridgePage = await enterBridgeQuote(driver);
+        await bridgePage.submitQuote();
         await bridgePage.submitQuoteAndDismiss();
         await homePage.goToActivityList();
 
