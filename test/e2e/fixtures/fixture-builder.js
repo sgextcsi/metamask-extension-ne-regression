@@ -274,21 +274,7 @@ class FixtureBuilder {
     });
   }
 
-  withNetworkControllerOnPolygon() {
-    return this.withNetworkController({
-      networkConfigurations: {
-        networkConfigurationId: {
-          chainId: CHAIN_IDS.POLYGON,
-          nickname: POLYGON_DISPLAY_NAME,
-          rpcPrefs: {},
-          rpcUrl: 'https://mainnet.infura.io',
-          ticker: 'ETH',
-          networkConfigurationId: 'networkConfigurationId',
-          id: 'networkConfigurationId',
-        },
-      },
-    });
-  }
+
 
   withNetworkControllerDoubleNode() {
     const secondNode = mockNetworkStateOld({
@@ -376,6 +362,27 @@ class FixtureBuilder {
       },
     });
   }
+
+   withNetworkControllerOnPolygon() {
+    return this.withNetworkController({
+      selectedNetworkClientId: 'polygon',
+      networkConfigurations: {
+        polygon: {
+          chainId: CHAIN_IDS.POLYGON,
+          nickname: 'POL',
+          rpcUrl: `https://polygon-mainnet.infura.io/v3/${getInfuraProjectId()}`,
+          ticker: 'MATIC',
+          rpcPrefs: {
+            blockExplorerUrl: 'https://polygonscan.com/',
+          },
+          id: 'polygon',
+          type: 'rpc',
+          isCustom: true,
+        },
+      },
+    });
+  }
+
 
   withNetworkControllerOnBase() {
     return this.withNetworkController({
