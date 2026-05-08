@@ -82,6 +82,66 @@ const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const allNetworkResults: NetworkNativeValidationResult[] = [];
 
+const requestedNetworksFromEnv = (
+  globalThis as {
+    process?: {
+      env?: {
+        NETWORK?: string;
+      };
+    };
+  }
+).process?.env?.NETWORK;
+
+const requestedNetworks = (requestedNetworksFromEnv ?? '')
+  .split(',')
+  .map((network: string) => network.trim())
+  .filter(Boolean);
+
+function getSelectedNetworkConfigs(): NetworkConfig[] {
+  if (!requestedNetworks.length) {
+    return NETWORK_CONFIGS;
+  }
+
+  const normalizedRequestedNetworks = new Set(
+    requestedNetworks.map((network: string) => network.toLowerCase()),
+  );
+
+  const selectedNetworkConfigs = NETWORK_CONFIGS.filter((networkConfig) => {
+    return (
+      normalizedRequestedNetworks.has(networkConfig.networkId.toLowerCase()) ||
+      normalizedRequestedNetworks.has(networkConfig.networkName.toLowerCase())
+    );
+  });
+
+  const matchedRequestedNetworks = new Set(
+    selectedNetworkConfigs.flatMap((networkConfig) => [
+      networkConfig.networkId.toLowerCase(),
+      networkConfig.networkName.toLowerCase(),
+    ]),
+  );
+
+  const unknownRequestedNetworks = requestedNetworks.filter(
+    (requestedNetwork: string) =>
+      !matchedRequestedNetworks.has(requestedNetwork.toLowerCase()),
+  );
+
+  if (unknownRequestedNetworks.length) {
+    const availableNetworks = NETWORK_CONFIGS.flatMap((networkConfig) => [
+      networkConfig.networkId,
+      networkConfig.networkName,
+    ]).join(', ');
+
+    throw new Error(
+      `Unknown NETWORK value(s): ${unknownRequestedNetworks.join(', ')}. ` +
+        `Available values include: ${availableNetworks}`,
+    );
+  }
+
+  return selectedNetworkConfigs;
+}
+
+const networkConfigsForTestRun = getSelectedNetworkConfigs();
+
 
 function normalizeText(value: string): string {
   return value.trim().replace(/\s+/gu, ' ').toLowerCase();
@@ -751,7 +811,16 @@ describe('Production E2E: Import Networks And Record Native Asset Validation', f
   this.timeout(14400000);
 
 
-  NETWORK_CONFIGS.forEach((networkConfig) => {
+  before(function () {
+    console.log(
+      `[PROD TEST] Running native logo import test for networks: ${networkConfigsForTestRun
+        .map((networkConfig) => networkConfig.networkName)
+        .join(', ')}`,
+    );
+  });
+
+
+  networkConfigsForTestRun.forEach((networkConfig) => {
     it(`imports ${networkConfig.networkName} and records native asset validation`, async function () {
       this.timeout(900000);
 

@@ -155,7 +155,7 @@ export const TOKENS_TO_IMPORT = 3;
 /**
  * Default from amount for swap tests
  */
-export const DEFAULT_SWAP_AMOUNT = 20;
+export const DEFAULT_SWAP_AMOUNT = 2;
 
 /**
  * Network configurations for swap quotation tests
