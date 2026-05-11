@@ -258,17 +258,21 @@ class FixtureBuilder {
     });
   }
 
-  withNetworkControllerOnOptimism() {
+withNetworkControllerOnOptimism() {
     return this.withNetworkController({
+      selectedNetworkClientId: 'optimism',
       networkConfigurations: {
-        networkConfigurationId: {
+        optimism: {
           chainId: CHAIN_IDS.OPTIMISM,
-          nickname: LOCALHOST_DISPLAY_NAME,
-          rpcPrefs: {},
-          rpcUrl: 'https://mainnet.infura.io',
+          nickname: 'OP',
+          rpcUrl: `https://optimism-mainnet.infura.io/v3/${getInfuraProjectId()}`,
           ticker: 'ETH',
-          networkConfigurationId: 'networkConfigurationId',
-          id: 'networkConfigurationId',
+          rpcPrefs: {
+            blockExplorerUrl: 'https://optimistic.etherscan.io/',
+          },
+          id: 'optimism',
+          type: 'rpc',
+          isCustom: true,
         },
       },
     });
@@ -276,15 +280,19 @@ class FixtureBuilder {
 
   withNetworkControllerOnPolygon() {
     return this.withNetworkController({
+      selectedNetworkClientId: 'polygon',
       networkConfigurations: {
-        networkConfigurationId: {
+        polygon: {
           chainId: CHAIN_IDS.POLYGON,
-          nickname: POLYGON_DISPLAY_NAME,
-          rpcPrefs: {},
-          rpcUrl: 'https://mainnet.infura.io',
-          ticker: 'ETH',
-          networkConfigurationId: 'networkConfigurationId',
-          id: 'networkConfigurationId',
+          nickname: 'POL',
+          rpcUrl: `https://polygon-mainnet.infura.io/v3/${getInfuraProjectId()}`,
+          ticker: 'MATIC',
+          rpcPrefs: {
+            blockExplorerUrl: 'https://polygonscan.com/',
+          },
+          id: 'polygon',
+          type: 'rpc',
+          isCustom: true,
         },
       },
     });
@@ -319,17 +327,17 @@ class FixtureBuilder {
 
   withNetworkControllerOnMegaETH() {
     return this.withNetworkController({
-      selectedNetworkClientId: 'megaeth-testnet-v2',
+      selectedNetworkClientId: 'megaeth-mainnet',
       networkConfigurations: {
-        'megaeth-testnet-v2': {
-          chainId: CHAIN_IDS.MEGAETH_TESTNET_V2,
-          nickname: 'MegaETH Testnet',
-          rpcUrl: 'https://carrot.megaeth.com/rpc',
-          ticker: 'MegaETH',
+        'megaeth-mainnet': {
+          chainId: CHAIN_IDS.MEGAETH_MAINNET,
+          nickname: 'MegaETH',
+          rpcUrl: `https://megaeth-mainnet.infura.io/v3/${getInfuraProjectId()}`,
+          ticker: 'ETH',
           rpcPrefs: {
-            blockExplorerUrl: 'https://megaeth-testnet-v2.blockscout.com',
+            blockExplorerUrl: 'https://megaeth.blockscout.com',
           },
-          id: 'megaeth-testnet-v2',
+          id: 'megaeth-mainnet',
           type: 'rpc',
           isCustom: true,
         },

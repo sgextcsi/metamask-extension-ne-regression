@@ -22,6 +22,65 @@ import { SendTransactionReporter } from './send-transaction-reporter';
 import { generateSendConsolidatedReport } from './generate-send-report';
 import { SendTransactionResult } from './send-transaction-types';
 
+const requestedNetworksFromEnv = (
+  globalThis as {
+    process?: {
+      env?: {
+        NETWORK?: string;
+      };
+    };
+  }
+).process?.env?.NETWORK;
+
+const requestedNetworks = (requestedNetworksFromEnv ?? '')
+  .split(',')
+  .map((network: string) => network.trim())
+  .filter(Boolean);
+
+function getSelectedCustomNetworks(): NetworkTestConfig[] {
+  const networks = getCustomNetworksForTesting();
+
+  if (!requestedNetworks.length) {
+    return networks;
+  }
+
+  const normalizedRequestedNetworks = new Set(
+    requestedNetworks.map((network: string) => network.toLowerCase()),
+  );
+
+  const selectedNetworks = networks.filter((networkConfig) => {
+    return (
+      normalizedRequestedNetworks.has(networkConfig.id.toLowerCase()) ||
+      normalizedRequestedNetworks.has(networkConfig.networkName.toLowerCase())
+    );
+  });
+
+  const matchedRequestedNetworks = new Set(
+    selectedNetworks.flatMap((networkConfig) => [
+      networkConfig.id.toLowerCase(),
+      networkConfig.networkName.toLowerCase(),
+    ]),
+  );
+
+  const unknownRequestedNetworks = requestedNetworks.filter(
+    (requestedNetwork: string) =>
+      !matchedRequestedNetworks.has(requestedNetwork.toLowerCase()),
+  );
+
+  if (unknownRequestedNetworks.length) {
+    const availableNetworks = networks
+      .flatMap((networkConfig) => [networkConfig.id, networkConfig.networkName])
+      .join(', ');
+
+    throw new Error(
+      `Unknown NETWORK value(s): ${unknownRequestedNetworks.join(', ')}. ` +
+        `Available values include: ${availableNetworks}`,
+    );
+  }
+
+  return selectedNetworks;
+}
+
 type RuntimeNetworkConfig = NetworkTestConfig & {
   chainId: number;
   rpcUrl: string;
@@ -43,8 +102,16 @@ type RuntimeNetworkConfig = NetworkTestConfig & {
  */
 describe('Production E2E: Custom Networks, Import Account and Send (Parameterized)', function (this: Suite) {
   // Get all custom networks to test from configuration
-  const networks = getCustomNetworksForTesting();
+  const networks = getSelectedCustomNetworks();
   const allNetworkResults: SendTransactionResult[] = [];
+
+  before(function () {
+    console.log(
+      `[PROD TEST] Running custom network send test for: ${networks
+        .map((networkConfig) => networkConfig.networkName)
+        .join(', ')}`,
+    );
+  });
 
   // Run test for each network
   networks.forEach((networkConfig: NetworkTestConfig) => {

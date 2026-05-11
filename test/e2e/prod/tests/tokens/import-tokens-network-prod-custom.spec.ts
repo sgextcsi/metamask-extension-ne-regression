@@ -832,14 +832,84 @@ async function runTokenImportTest(
  */
 const allNetworkResults: NetworkTestResult[] = [];
 
+const requestedNetworksFromEnv = (
+  globalThis as {
+    process?: {
+      env?: {
+        NETWORK?: string;
+      };
+    };
+  }
+).process?.env?.NETWORK;
+
+const requestedNetworks = (requestedNetworksFromEnv ?? '')
+  .split(',')
+  .map((network: string) => network.trim())
+  .filter(Boolean);
+
+function getSelectedNetworkConfigs(): NetworkConfig[] {
+  if (!requestedNetworks.length) {
+    return NETWORK_CONFIGS;
+  }
+
+  const normalizedRequestedNetworks = new Set(
+    requestedNetworks.map((network: string) => network.toLowerCase()),
+  );
+
+  const selectedNetworkConfigs = NETWORK_CONFIGS.filter((networkConfig) => {
+    return (
+      normalizedRequestedNetworks.has(networkConfig.networkId.toLowerCase()) ||
+      normalizedRequestedNetworks.has(networkConfig.networkName.toLowerCase())
+    );
+  });
+
+  const matchedRequestedNetworks = new Set(
+    selectedNetworkConfigs.flatMap((networkConfig) => [
+      networkConfig.networkId.toLowerCase(),
+      networkConfig.networkName.toLowerCase(),
+    ]),
+  );
+
+  const unknownRequestedNetworks = requestedNetworks.filter(
+    (requestedNetwork: string) =>
+      !matchedRequestedNetworks.has(requestedNetwork.toLowerCase()),
+  );
+
+  if (unknownRequestedNetworks.length) {
+    const availableNetworks = NETWORK_CONFIGS.flatMap((networkConfig) => [
+      networkConfig.networkId,
+      networkConfig.networkName,
+    ]).join(', ');
+
+    throw new Error(
+      `Unknown NETWORK value(s): ${unknownRequestedNetworks.join(', ')}. ` +
+        `Available values include: ${availableNetworks}`,
+    );
+  }
+
+  return selectedNetworkConfigs;
+}
+
+const networkConfigsForTestRun = getSelectedNetworkConfigs();
+
 /**
  * Generate tests for all configured networks
  */
 describe('Production E2E: Import Tokens for Multiple Networks', function (this: Suite) {
   this.timeout(14400000); // 4 hours for importing many tokens across all networks
 
+  before(function () {
+    console.log(
+      `[PROD TEST] Running token import test for networks: ${
+        networkConfigsForTestRun
+          .map((networkConfig) => networkConfig.networkName)
+          .join(', ')
+      }`,
+    );
+  });
+
   // Generate a test for each network in the configuration
-  NETWORK_CONFIGS.forEach((networkConfig) => {
+  networkConfigsForTestRun.forEach((networkConfig) => {
     it(`imports all tokens from ${networkConfig.networkName} (Chain ID: ${networkConfig.chainId})`, async function () {
       // Set per-test timeout to 60 minutes per network
       this.timeout(3600000);
