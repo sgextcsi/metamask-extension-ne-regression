@@ -17,7 +17,7 @@ import FixtureBuilder from '../../../fixtures/fixture-builder';
 import { withProductionFixtures } from '../../helpers/prod-with-fixtures';
 import { Driver } from '../../../webdriver/driver';
 import { PROD_DELAYS } from '../../helpers/prod-test-helpers';
-import { loginWithoutBalanceValidation } from '../../../page-objects/flows/login.flow';
+import { login } from '../../../page-objects/flows/login.flow';
 import { switchToEditRPCViaGlobalMenuNetworks } from '../../../page-objects/flows/network.flow';
 import SelectNetwork from '../../../page-objects/pages/dialog/select-network';
 import AddEditNetworkModal from '../../../page-objects/pages/dialog/add-edit-network';
@@ -75,7 +75,7 @@ async function runTokenImportTest(
     },
     async ({ driver }: { driver: Driver }) => {
       // Login
-      await loginWithoutBalanceValidation(driver);
+      await login(driver, { validateBalance: false });
 
       console.log(
         `[PROD TEST] Starting ${networkConfig.networkName} network addition...`,

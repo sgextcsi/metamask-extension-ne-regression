@@ -22,7 +22,7 @@ import { Suite } from 'mocha';
 import FixtureBuilder from '../../../fixtures/fixture-builder';
 import { withProductionFixtures } from '../../helpers/prod-with-fixtures';
 import { PROD_DELAYS } from '../../helpers/prod-test-helpers';
-import { loginWithoutBalanceValidation } from '../../../page-objects/flows/login.flow';
+import { login } from '../../../page-objects/flows/login.flow';
 import HomePage from '../../../page-objects/pages/home/homepage';
 import NetworkManager from '../../../page-objects/pages/network-manager';
 import { Driver } from '../../../webdriver/driver';
@@ -102,7 +102,7 @@ describe('Production E2E: Multi-Network Swap Quotation Validation', function (th
 
             // Step 1: Login
             console.log(`[TEST] Logging in to wallet...`);
-            await loginWithoutBalanceValidation(driver);
+            await login(driver, { validateBalance: false });
             const homePage = new HomePage(driver);
             await homePage.checkPageIsLoaded();
             await driver.delay(PROD_DELAYS.API_RESPONSE);

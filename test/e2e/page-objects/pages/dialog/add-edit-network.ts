@@ -59,6 +59,22 @@ class AddEditNetworkModal {
   private readonly settingsV2NetworksPageList =
     '[data-testid="networks-page-list"]';
 
+  private async getNetworksPageBackButtonSelector(): Promise<string | null> {
+    if (
+      await this.driver.isElementPresentAndVisible(
+        this.settingsV2NetworksPageBackButton,
+      )
+    ) {
+      return this.settingsV2NetworksPageBackButton;
+    }
+
+    if (await this.driver.isElementPresentAndVisible(this.backButton)) {
+      return this.backButton;
+    }
+
+    return null;
+  }
+
   private readonly explorerUrlInputDropDownButton = {
     testId: 'test-explorer-drop-down',
   };
@@ -218,7 +234,11 @@ class AddEditNetworkModal {
       if (
         await this.driver.isElementPresentAndVisible(this.settingsV2NetworksPageList)
       ) {
-        await this.driver.clickElement(this.settingsV2NetworksPageBackButton);
+        const backButtonSelector = await this.getNetworksPageBackButtonSelector();
+
+        if (backButtonSelector) {
+          await this.driver.clickElement(backButtonSelector);
+        }
       }
 
       await this.driver.assertElementNotPresent(this.settingsV2NetworksPageList, {

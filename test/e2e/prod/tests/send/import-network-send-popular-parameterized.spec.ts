@@ -2,7 +2,7 @@ import { Suite } from 'mocha';
 import FixtureBuilder from '../../../fixtures/fixture-builder';
 import { withProductionFixtures } from '../../helpers/prod-with-fixtures';
 import { PROD_DELAYS } from '../../helpers/prod-test-helpers';
-import { loginWithoutBalanceValidation } from '../../../page-objects/flows/login.flow';
+import { login } from '../../../page-objects/flows/login.flow';
 import HomePage from '../../../page-objects/pages/home/homepage';
 import AccountListPage from '../../../page-objects/pages/account-list-page';
 import SendPage from '../../../page-objects/pages/send/send-page';
@@ -174,7 +174,7 @@ async function runNetworkSendTest(
       'Wallet login successful and home page loaded',
     );
     console.log(`[PROD TEST] Logging in to wallet...`);
-    await loginWithoutBalanceValidation(driver);
+    await login(driver, { validateBalance: false });
 
     // Verify home page is loaded
     const homePage = new HomePage(driver);
