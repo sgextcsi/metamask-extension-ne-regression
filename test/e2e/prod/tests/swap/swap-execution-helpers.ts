@@ -219,7 +219,7 @@ export async function submitSwapAndWaitForConfirmed(
 
   // Open the activity tab and wait for the confirmed swap entry
   const activityListPage = new ActivityListPage(driver);
-  await activityListPage.openActivityTab();
+  await activityListPage.goToActivityList();
 
   const swapLabel = `Swap ${swapFromSymbol} to ${swapToSymbol}`;
   console.log(
