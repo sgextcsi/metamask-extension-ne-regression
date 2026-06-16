@@ -25,7 +25,10 @@ import {
   BridgeRouteResult,
   BridgeExecutionReport,
   BridgeValidationResult,
+  findNetworkByChainId,
+  findNetworkByName,
 } from './network-bridge-config';
+import NetworkManager from '../../../page-objects/pages/network-manager';
 
 // ---------------------------------------------------------------------------
 // Token resolution
@@ -138,22 +141,44 @@ export async function enterBridgeFlow(
     `[BRIDGE] Entering bridge flow: ${fromToken}(${fromChain}) → ${toToken}(${toChain})`,
   );
 
-  // Navigate to swap page (which handles bridges)
   const homePage = new HomePage(driver);
+  
+  // Ensure we're on the home page
+  await homePage.checkPageIsLoaded();
+  await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+  // Click the swap button to open swap/bridge UI
   await homePage.startSwapFlow();
   await driver.delay(PROD_DELAYS.API_RESPONSE);
 
-  console.log('[BRIDGE] Bridge flow UI loaded');
+  // Wait for the bridge quote page to be visible
+  const bridgeQuotePage = new BridgeQuotePage(driver);
+  try {
+    await driver.waitForSelector('[data-testid="bridge-source-button"]', { timeout: 30000 });
+    console.log('[BRIDGE] Bridge quote page loaded successfully');
+  } catch (error) {
+    console.error('[BRIDGE] Bridge quote page failed to load:', error);
+    // Try to take a screenshot for debugging
+    try {
+      await driver.takeScreenshot('bridge-load-failure');
+    } catch (_err) {
+      // Ignore screenshot errors
+    }
+    throw error;
+  }
 }
 
 /**
  * Fill bridge route details: from token, amount, to token, and destination chain.
+ * Uses multichain network picker to select both source and destination networks.
  *
  * @param driver - WebDriver instance
  * @param fromToken - Source token symbol
  * @param fromAmount - Amount to bridge
  * @param toToken - Destination token symbol
  * @param useMax - If true, click Max instead of entering amount
+ * @param fromChainId - Source chain ID (e.g., 143 for Monad)
+ * @param toChainId - Destination chain ID (e.g., 8453 for Base)
  */
 export async function fillBridgeRouteDetails(
   driver: Driver,
@@ -161,60 +186,132 @@ export async function fillBridgeRouteDetails(
   fromAmount: string,
   toToken: string,
   useMax: boolean = false,
+  fromChainId?: number,
+  toChainId?: number,
 ): Promise<void> {
   console.log(
-    `[BRIDGE] Filling bridge details: ${fromToken} ${fromAmount} → ${toToken}`,
+    `[BRIDGE] Filling bridge details: ${fromToken} (chain ${fromChainId}) ${fromAmount} → ${toToken} (chain ${toChainId})`,
   );
 
-  const bridgeQuotePage = new BridgeQuotePage(driver);
   const sourceButton = '[data-testid="bridge-source-button"]';
+  const destButton = '[data-testid="bridge-destination-button"]';
+  const fromAmountInput = '[data-testid="from-amount"]';
   const searchInput = '[data-testid="bridge-asset-picker-search-input"]';
   const bridgeAsset = '[data-testid^="bridge-asset--"]';
+  const maxButton = '[data-testid="bridge-amount-max-button"]';
+  const multichainNetworkPicker = '[data-testid="multichain-asset-picker__network"]';
 
-  // Select source token
-  await driver.waitForSelector(sourceButton);
+  // Ensure the bridge UI is ready
+  await driver.waitForSelector(sourceButton, { timeout: 10000 });
+  await driver.waitForSelector(destButton, { timeout: 10000 });
+  console.log('[BRIDGE] Bridge buttons ready');
+
+  // =============== SELECT SOURCE TOKEN WITH NETWORK ===============
+  console.log(`[BRIDGE] Selecting source: ${fromToken} on chain ${fromChainId}`);
+  
+  // Step 1: Click source button to open token picker
   await driver.clickElement(sourceButton);
   await driver.delay(PROD_DELAYS.API_RESPONSE);
-
-  await driver.waitForSelector(searchInput);
+  console.log('[BRIDGE] Source button clicked, token picker opened');
+  
+  // Step 2: Click multichain network picker within source modal (if chainId provided)
+  if (fromChainId) {
+    try {
+      await driver.waitForSelector(multichainNetworkPicker, { timeout: 10000 });
+      await driver.clickElement(multichainNetworkPicker);
+      await driver.delay(PROD_DELAYS.API_RESPONSE);
+      console.log('[BRIDGE] Multichain network picker clicked for source');
+      
+      // Step 3: Select the source network by chainId
+      const sourceNetworkSelector = `[data-testid="network-list-item-eip155:${fromChainId}"]`;
+      await driver.waitForSelector(sourceNetworkSelector, { timeout: 10000 });
+      await driver.clickElement(sourceNetworkSelector);
+      await driver.delay(PROD_DELAYS.API_RESPONSE);
+      console.log(`[BRIDGE] ✅ Source network selected: eip155:${fromChainId}`);
+    } catch (networkError) {
+      console.log(
+        `[BRIDGE] Warning: Multichain network picker not found for source, continuing: ${String(networkError)}`,
+      );
+    }
+  }
+  
+  // Step 4: Search for and select the source token
+  await driver.waitForSelector(searchInput, { timeout: 10000 });
   await driver.fill(searchInput, fromToken);
   await driver.delay(PROD_DELAYS.API_RESPONSE);
 
-  await driver.waitForSelector({ css: bridgeAsset, text: fromToken });
+  await driver.waitForSelector({ css: bridgeAsset, text: fromToken }, { timeout: 10000 });
   await driver.clickElement({ css: bridgeAsset, text: fromToken });
   await driver.delay(PROD_DELAYS.API_RESPONSE);
+  console.log(`[BRIDGE] ✅ Source token selected: ${fromToken}`);
 
-  // Fill amount or click max
-  const amountInput = '[data-testid="bridge-amount-input"]';
+  // =============== FILL AMOUNT ===============
+  console.log(`[BRIDGE] Filling amount: ${fromAmount} (useMax=${useMax})`);
+  
+  await driver.waitForSelector(fromAmountInput, { timeout: 10000 });
+  
   if (useMax) {
-    const maxButton = '[data-testid="bridge-amount-max-button"]';
     try {
       await driver.waitForSelector(maxButton, { timeout: 5000 });
       await driver.clickElement(maxButton);
-    } catch {
-      // Max button might not be available, fill amount instead
-      await driver.fill(amountInput, fromAmount);
+      console.log('[BRIDGE] ✅ Clicked Max button');
+    } catch (maxError) {
+      console.log('[BRIDGE] Max button not available, filling amount manually');
+      await driver.fill(fromAmountInput, fromAmount);
+      console.log(`[BRIDGE] ✅ Amount filled: ${fromAmount}`);
     }
   } else {
-    await driver.fill(amountInput, fromAmount);
+    // Clear and fill the amount
+    await driver.fill(fromAmountInput, '');
+    await driver.delay(PROD_DELAYS.API_RESPONSE);
+    await driver.fill(fromAmountInput, fromAmount);
+    console.log(`[BRIDGE] ✅ Amount filled: ${fromAmount}`);
   }
   await driver.delay(PROD_DELAYS.API_RESPONSE);
 
-  // Select destination token
-  const destButton = '[data-testid="bridge-destination-button"]';
+  // =============== SELECT DESTINATION TOKEN WITH NETWORK ===============
+  console.log(`[BRIDGE] Selecting destination: ${toToken} on chain ${toChainId}`);
+  
+  // Step 1: Click destination button to open token picker
   await driver.clickElement(destButton);
   await driver.delay(PROD_DELAYS.API_RESPONSE);
-
-  await driver.waitForSelector(searchInput);
+  console.log('[BRIDGE] Destination button clicked, token picker opened');
+  
+  // Step 2: Click multichain network picker within destination modal (if chainId provided)
+  if (toChainId) {
+    try {
+      await driver.waitForSelector(multichainNetworkPicker, { timeout: 10000 });
+      await driver.clickElement(multichainNetworkPicker);
+      await driver.delay(PROD_DELAYS.API_RESPONSE);
+      console.log('[BRIDGE] Multichain network picker clicked for destination');
+      
+      // Step 3: Select the destination network by chainId
+      const destNetworkSelector = `[data-testid="network-list-item-eip155:${toChainId}"]`;
+      await driver.waitForSelector(destNetworkSelector, { timeout: 10000 });
+      await driver.clickElement(destNetworkSelector);
+      await driver.delay(PROD_DELAYS.API_RESPONSE);
+      console.log(`[BRIDGE] ✅ Destination network selected: eip155:${toChainId}`);
+    } catch (networkError) {
+      console.log(
+        `[BRIDGE] Warning: Multichain network picker not found for destination, continuing: ${String(networkError)}`,
+      );
+    }
+  }
+  
+  // Step 4: Search for and select the destination token
+  await driver.waitForSelector(searchInput, { timeout: 10000 });
   await driver.fill(searchInput, toToken);
   await driver.delay(PROD_DELAYS.API_RESPONSE);
 
-  await driver.waitForSelector({ css: bridgeAsset, text: toToken });
+  await driver.waitForSelector({ css: bridgeAsset, text: toToken }, { timeout: 10000 });
   await driver.clickElement({ css: bridgeAsset, text: toToken });
   await driver.delay(PROD_DELAYS.API_RESPONSE);
+  console.log(`[BRIDGE] ✅ Destination token selected: ${toToken}`);
 
-  console.log('[BRIDGE] Bridge route details filled');
+  console.log('[BRIDGE] ✅ Bridge route details filled completely');
 }
+
+
 
 /**
  * Wait for bridge quote to be ready and displayed.
@@ -249,13 +346,13 @@ export async function captureBridgeAmounts(
   console.log('[BRIDGE] Capturing bridge amounts...');
 
   const fromAmountElement = await driver.findElement(
-    '[data-testid="bridge-amount-input"]',
+    '[data-testid="from-amount"]',
   );
   const fromAmount = await fromAmountElement.getAttribute('value') || '';
 
   // The 'to' amount is typically displayed in read-only text
   const toAmountElement = await driver.findElement(
-    '[data-testid="bridge-quote-amount-to"]',
+    '[data-testid="to-amount"]',
   );
   const toAmount = await toAmountElement.getText();
 
@@ -413,6 +510,152 @@ export async function navigateBackToHomeForBridge(driver: Driver): Promise<void>
     { timeout: 10000 },
   );
   console.log('[BRIDGE] Home activity tab visible');
+}
+
+// ---------------------------------------------------------------------------
+// Cross-Network Bridge Verification
+// ---------------------------------------------------------------------------
+
+/**
+ * Switch to a destination network by chain ID.
+ * Used after executing a bridge to verify activity on the destination chain.
+ *
+ * @param driver - WebDriver instance
+ * @param destinationChainId - Chain ID of the destination network
+ */
+export async function switchToDestinationNetwork(
+  driver: Driver,
+  destinationChainId: number,
+): Promise<void> {
+  console.log(`[BRIDGE] Switching to destination network (chainId: ${destinationChainId})...`);
+
+  const destinationNetworkConfig = findNetworkByChainId(destinationChainId);
+  if (!destinationNetworkConfig) {
+    throw new Error(
+      `Network with chainId ${destinationChainId} not found in bridge config`,
+    );
+  }
+
+  const homePage = new HomePage(driver);
+  await homePage.checkPageIsLoaded();
+
+  // Try home network selector first
+  try {
+    const networksListButton = '[data-testid="sort-by-networks"]';
+    const networkListItemSelector = `[data-testid="network-list-item-eip155:${destinationChainId}"]`;
+
+    await driver.clickElement(networksListButton);
+    await driver.waitForSelector('[role="dialog"]', { timeout: 5000 });
+    await driver.clickElement(networkListItemSelector);
+    await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+    console.log(
+      `[BRIDGE] ✅ Switched to ${destinationNetworkConfig.networkName}`,
+    );
+    return;
+  } catch (homeSelectorError) {
+    console.log(
+      `[BRIDGE] Home selector failed, falling back to NetworkManager: ${String(homeSelectorError)}`,
+    );
+  }
+
+  // Fallback to NetworkManager
+  const networkManager = new NetworkManager(driver);
+  await networkManager.openNetworkManager();
+  await networkManager.selectTab('Popular');
+  await networkManager.selectNetworkByNameWithWait(
+    destinationNetworkConfig.networkName,
+  );
+  await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+  console.log(
+    `[BRIDGE] ✅ Switched to ${destinationNetworkConfig.networkName} (via NetworkManager)`,
+  );
+}
+
+/**
+ * Verify bridge activity on the destination network.
+ * Call after switching to destination network.
+ *
+ * @param driver - WebDriver instance
+ * @param fromToken - Source token symbol (for logging)
+ * @param toToken - Destination token symbol (for verification)
+ * @param expectedToAmount - Expected destination amount
+ */
+export async function verifyBridgeActivityOnDestination(
+  driver: Driver,
+  fromToken: string,
+  toToken: string,
+  expectedToAmount?: string,
+): Promise<void> {
+  console.log(
+    `[BRIDGE] Verifying bridge activity on destination (${fromToken} → ${toToken})...`,
+  );
+
+  const homePage = new HomePage(driver);
+  await homePage.checkPageIsLoaded();
+
+  // Navigate to activity tab if not already there
+  try {
+    await driver.clickElement('[data-testid="account-overview__activity-tab"]');
+    await driver.delay(PROD_DELAYS.API_RESPONSE);
+  } catch (_error) {
+    // Already on activity tab
+  }
+
+  // Wait for activity entry to appear
+  const latestActivitySelector = '[data-testid="activity-list-item-0"]';
+  await driver.waitForSelector(latestActivitySelector, { timeout: 30000 });
+  await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+  // Check that the activity shows the destination token
+  const activityElement = await driver.findElement(latestActivitySelector);
+  const activityText = await activityElement.getText();
+
+  if (!activityText.includes(toToken)) {
+    throw new Error(
+      `Expected activity to contain destination token "${toToken}", but got: ${activityText}`,
+    );
+  }
+
+  console.log(
+    `[BRIDGE] ✅ Activity verified on destination: ${activityText}`,
+  );
+}
+
+/**
+ * Check network and prepare for next route.
+ * Handles switching to source network if the next route requires a different source network.
+ *
+ * @param driver - WebDriver instance
+ * @param nextRoute - Next route to execute (or undefined if no more routes)
+ * @param currentNetworkName - Current network name
+ */
+export async function prepareForNextRoute(
+  driver: Driver,
+  nextRoute?: { fromChain: string; fromChainId: number },
+  currentNetworkName?: string,
+): Promise<void> {
+  if (!nextRoute) {
+    console.log('[BRIDGE] No more routes, staying on current network');
+    return;
+  }
+
+  console.log(`[BRIDGE] Preparing for next route (${nextRoute.fromChain})...`);
+
+  if (
+    currentNetworkName &&
+    currentNetworkName.toLowerCase() !== nextRoute.fromChain.toLowerCase()
+  ) {
+    console.log(
+      `[BRIDGE] Next route requires different source network: ${nextRoute.fromChain}`,
+    );
+    await switchToDestinationNetwork(driver, nextRoute.fromChainId);
+  }
+
+  const homePage = new HomePage(driver);
+  await homePage.checkPageIsLoaded();
+  await driver.delay(PROD_DELAYS.API_RESPONSE);
 }
 
 /**

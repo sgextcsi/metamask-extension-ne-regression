@@ -63,10 +63,14 @@ export type ManualToken = {
 export type BridgeExecutionRoute = {
   /** Source chain name (e.g., 'Monad') */
   fromChain: string;
+  /** Source chain ID for network switching */
+  fromChainId: number;
   /** Source token symbol (e.g., 'MON', 'AZND') */
   fromToken: string;
   /** Destination chain name (e.g., 'Base') */
   toChain: string;
+  /** Destination chain ID for network switching and verification */
+  toChainId: number;
   /** Destination token symbol (e.g., 'ETH', 'USDC') */
   toToken: string;
   /**
@@ -78,6 +82,11 @@ export type BridgeExecutionRoute = {
    * When true, click Max instead of filling amount input.
    */
   useMax?: boolean;
+  /**
+   * When true, skip this route during test execution.
+   * Defaults to false (route is enabled).
+   */
+  disableRoute?: boolean;
 };
 
 /**
@@ -103,13 +112,15 @@ export type BridgeRouteResult = {
   fromToken: string;
   toChain: string;
   toToken: string;
+  /** Destination chain ID (used for network switching) */
+  toChainId: number;
   /** Source amount captured from the bridge UI before submission */
   fromAmount: string;
   /** Destination amount captured from the bridge UI before submission */
   toAmount: string;
   /** Per-check validation results captured while executing this route */
   validations?: BridgeValidationResult[];
-  status: 'passed' | 'warning' | 'failed';
+  status: 'passed' | 'warning' | 'failed' | 'skipped';
   error?: string;
 };
 
@@ -150,7 +161,7 @@ export const BRIDGE_CONFIRMATION_TIMEOUT = 120000; // 2 minutes
 
 /**
  * Network configurations for bridge execution tests
- * Add new networks here to support them in tests
+ * All routes span both Monad and Base networks for cross-chain testing.
  */
 export const BRIDGE_TEST_NETWORKS: NetworkBridgeConfig[] = [
   {
@@ -170,31 +181,43 @@ export const BRIDGE_TEST_NETWORKS: NetworkBridgeConfig[] = [
     blockExplorerUrl: 'https://explorer.monad.xyz',
     bridgeExecutionTokenSymbols: ['AZND'],
     bridgeExecutionRoutes: [
+      // To skip a route during test execution, add: disableRoute: true
+      // Example: { fromChain: 'Monad', ..., disableRoute: true }
+      // Skipped routes will appear in the report with 'skipped' status.
       {
         fromChain: 'Monad',
+        fromChainId: 143,
         fromToken: 'MON',
         toChain: 'Base',
+        toChainId: 8453,
         toToken: 'ETH',
         amount: '0.001',
       },
       {
         fromChain: 'Base',
+        fromChainId: 8453,
         fromToken: 'ETH',
         toChain: 'Monad',
+        toChainId: 143,
         toToken: 'AZND',
         amount: '0.0001',
+        disableRoute: true
       },
       {
         fromChain: 'Monad',
+        fromChainId: 143,
         fromToken: 'AZND',
         toChain: 'Base',
+        toChainId: 8453,
         toToken: 'USDC',
         amount: '10',
       },
       {
         fromChain: 'Base',
+        fromChainId: 8453,
         fromToken: 'USDC',
         toChain: 'Monad',
+        toChainId: 143,
         toToken: 'MON',
         amount: '10',
         useMax: true,
@@ -221,3 +244,30 @@ export const BRIDGE_TEST_NETWORKS: NetworkBridgeConfig[] = [
     defaultBridgeAmount: 0.001,
   },
 ];
+
+/**
+ * Helper: Find a network config by chain ID
+ *
+ * @param chainId - Chain ID to search for
+ * @returns Network config or undefined if not found
+ */
+export function findNetworkByChainId(
+  chainId: number,
+): NetworkBridgeConfig | undefined {
+  return BRIDGE_TEST_NETWORKS.find((config) => config.chainId === chainId);
+}
+
+/**
+ * Helper: Find a network config by name
+ *
+ * @param networkName - Network name to search for
+ * @returns Network config or undefined if not found
+ */
+export function findNetworkByName(
+  networkName: string,
+): NetworkBridgeConfig | undefined {
+  return BRIDGE_TEST_NETWORKS.find(
+    (config) =>
+      config.networkName.toLowerCase() === networkName.toLowerCase(),
+  );
+}

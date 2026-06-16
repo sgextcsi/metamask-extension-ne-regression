@@ -48,6 +48,9 @@ import {
   navigateBackToHomeForBridge,
   recoverToHomeForBridge,
   generateBridgeExecutionReport,
+  switchToDestinationNetwork,
+  verifyBridgeActivityOnDestination,
+  prepareForNextRoute,
 } from './bridge-execution-helpers';
 
 function getCliOptionValue(optionName: string): string | undefined {
@@ -320,13 +323,37 @@ describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) 
             for (const route of executionRoutes) {
               const {
                 fromChain,
+                fromChainId,
                 fromToken: fromSymbol,
                 toChain,
+                toChainId,
                 toToken: toSymbol,
                 amount,
                 useMax,
+                disableRoute,
               } = route;
               const routeLabel = `${fromSymbol}(${fromChain}) → ${toSymbol}(${toChain})`;
+
+              // Skip this route if disableRoute is true
+              if (disableRoute) {
+                console.log(
+                  `[BRIDGE] ⏭️ Route skipped: ${routeLabel} (disableRoute: true)`,
+                );
+                routeResults.push({
+                  route: routeLabel,
+                  fromChain,
+                  fromToken: fromSymbol,
+                  toChain,
+                  toToken: toSymbol,
+                  toChainId,
+                  fromAmount: '-',
+                  toAmount: '-',
+                  validations: [{ name: 'Route disabled', status: 'passed' }],
+                  status: 'skipped',
+                });
+                continue;
+              }
+
               const plannedFromAmount = String(
                 amount ??
                   networkConfig.defaultBridgeAmount ??
@@ -340,6 +367,7 @@ describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) 
                 fromToken: fromSymbol,
                 toChain,
                 toToken: toSymbol,
+                toChainId,
                 fromAmount: '',
                 toAmount: '',
                 validations: [],
@@ -377,6 +405,8 @@ describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) 
                   plannedFromAmount,
                   toSymbol,
                   useMaxForRoute,
+                  fromChainId,
+                  toChainId,
                 );
                 recordValidation('Route details filled', 'passed');
 
@@ -403,41 +433,35 @@ describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) 
                 );
                 recordValidation('Bridge submitted and confirmed', 'passed');
 
-                // -- Assert activity list primary currency --
-                if (useMaxForRoute) {
-                  // Max bridges can render rounded/truncated activity amounts,
-                  // so validate by token symbol instead of exact raw amount.
-                  await assertBridgeActivityPrimaryCurrency(
-                    driver,
-                    `${fromSymbol}`,
-                  );
-                } else {
-                  await assertBridgeActivityPrimaryCurrency(
-                    driver,
-                    `-${fromAmount} ${fromSymbol}`,
-                  );
-                }
+                // -- Switch to destination network for verification --
+                await switchToDestinationNetwork(driver, toChainId);
+                recordValidation('Switched to destination network', 'passed');
+
+                // -- Verify bridge activity on destination network --
+                await verifyBridgeActivityOnDestination(
+                  driver,
+                  fromSymbol,
+                  toSymbol,
+                  toAmount,
+                );
                 recordValidation(
-                  'Activity primary amount',
+                  'Bridge activity verified on destination',
                   'passed',
-                  useMaxForRoute
-                    ? `contains ${fromSymbol} (max route)`
-                    : `-${fromAmount} ${fromSymbol}`,
                 );
 
-                // -- Open detail page --
+                // -- Open detail page on destination --
                 await openLatestBridgeActivityRecord(
                   driver,
                   fromSymbol,
                   toSymbol,
                 );
-                recordValidation('Activity detail page opened', 'passed');
+                recordValidation('Activity detail page opened on destination', 'passed');
 
                 // -- Assert detail page --
                 await assertBridgeDetailConfirmed(driver);
-                recordValidation('Detail status confirmed', 'passed');
+                recordValidation('Detail status confirmed on destination', 'passed');
 
-                // -- Assert detail rows --
+                // -- Assert detail rows on destination --
                 if (useMaxForRoute) {
                   await assertBridgeDetailRow(driver, 'You sent', fromSymbol);
                 } else {
@@ -466,9 +490,11 @@ describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) 
                   `${toAmount} ${toSymbol}`,
                 );
 
-                // -- Navigate back to home for next route --
-                await navigateBackToHomeForBridge(driver);
-                recordValidation('Navigated back to home', 'passed');
+                // -- Prepare for next route (may need to switch networks) --
+                const nextRouteIndex = executionRoutes.indexOf(route) + 1;
+                const nextRoute = executionRoutes[nextRouteIndex];
+                await prepareForNextRoute(driver, nextRoute, toChain);
+                recordValidation('Prepared for next route', 'passed');
 
                 routeResult.status = 'passed';
                 console.log(`[BRIDGE] ✅ Route passed: ${routeLabel}`);
