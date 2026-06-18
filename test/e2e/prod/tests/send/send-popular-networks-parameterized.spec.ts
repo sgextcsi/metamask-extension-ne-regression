@@ -233,9 +233,9 @@ async function runNetworkSendTest(
     console.log(`[PROD TEST] Selecting ${networkName} network...`);
     const networkManager = new NetworkManager(driver);
     await networkManager.openNetworkManager();
-    if (tab) {
-      await networkManager.selectTab(tab);
-    }
+    // if (tab) {
+    //   await networkManager.selectTab(tab);
+    // }
     await networkManager.selectNetworkByNameWithWait(networkName);
 
     // Ensure network switch is fully applied before opening account import flow.

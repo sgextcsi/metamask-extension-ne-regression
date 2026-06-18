@@ -251,7 +251,7 @@ describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) 
               await dismissBlockingOverlays(driver);
               const networkManager = new NetworkManager(driver);
               await networkManager.openNetworkManager();
-              await networkManager.selectTab('Popular');
+              // await networkManager.selectTab('Popular');
               await networkManager.selectNetworkByNameWithWait(
                 networkConfig.networkName,
               );

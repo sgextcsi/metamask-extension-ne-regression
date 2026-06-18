@@ -325,8 +325,8 @@ async function runNetworkSendTest(
       // Select custom network from network selector
       // ================================================================
 
-      const chainIdHexVal = networkConfig.chainId;
-      const networkListItemSelector = `[data-testid="network-list-item-eip155:${chainIdHexVal}"]`;
+      const chainIdHexVal = networkConfig.chainIdHex;
+      const networkListItemSelector = `[data-testid="network-list-item-${chainIdHexVal}"]`;
       console.log(`[TEST] Clicking on network in list: ${networkListItemSelector}...`);
       await driver.clickElement(networkListItemSelector);
       await driver.delay(PROD_DELAYS.MODAL_TRANSITION);

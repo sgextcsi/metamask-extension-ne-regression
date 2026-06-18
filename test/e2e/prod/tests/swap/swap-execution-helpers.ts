@@ -221,7 +221,7 @@ export async function submitSwapAndWaitForConfirmed(
   const activityListPage = new ActivityListPage(driver);
   await activityListPage.goToActivityList();
 
-  const swapLabel = `Swap ${swapFromSymbol} to ${swapToSymbol}`;
+  const swapLabel = `Swapped ${swapFromSymbol} to ${swapToSymbol}`;
   console.log(
     `[EXEC] Waiting for confirmed activity: "${swapLabel}" (timeout: ${timeout}ms)`,
   );
