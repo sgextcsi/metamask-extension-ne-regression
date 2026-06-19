@@ -45,7 +45,7 @@ class NetworkManager {
     `[data-testid="${networkName}"]`;
 
   private readonly networkManagerCloseButton =
-    '[data-testid="modal-header-close-button"]';
+    '[data-testid="modal-header-close-button"], [aria-label="Close"]';
 
   private readonly networkManagerSelectAllButton =
     '[data-testid="network-manager-select-all"]';
@@ -78,14 +78,6 @@ class NetworkManager {
     await this.driver.clickElementAndWaitToDisappear(
       this.networkManagerCloseButton,
     );
-  }
-
-  async selectTab(tabName: string): Promise<void> {
-    console.log(`Selecting tab: ${tabName}`);
-    await this.driver.clickElement({
-      text: tabName,
-    });
-    await this.waitForCategoryContent(tabName);
   }
 
   async selectNetworkByNameWithWait(networkName: string): Promise<void> {
