@@ -406,6 +406,10 @@ export async function performSwapFlow(
 
   await driver.clickElement('[data-testid="account-overview__asset-tab"]');
   await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+  // Wait for asset list to stabilize before clicking token
+  await driver.delay(2000);
+
   // Some tokens display their full name instead of the symbol in the asset
   // list (e.g. AZND shows "Asian Dollar"). Derive the label to use as a
   // fallback when sourceTokenName is provided and differs from the symbol.
@@ -419,9 +423,9 @@ export async function performSwapFlow(
     try {
       await assetListPage.clickOnAsset(sourceTokenLabel);
     } catch (_err2) {
+      // Fallback: Try to find token by symbol OR label
       await driver.clickElement({
-        css: '[data-testid="multichain-token-list-button"]',
-        text: sourceTokenLabel,
+        xpath: `//*[@data-testid="multichain-token-list-button"][contains(., '${sourceTokenSymbol}') or contains(., '${sourceTokenLabel}')]`,
       });
     }
   }

@@ -143,28 +143,185 @@ async function switchToNetwork(
   await driver.delay(PROD_DELAYS.API_RESPONSE);
 }
 
+async function verifyUsdcTokenInAssetList(
+  assetListPage: AssetListPage,
+  timeoutMs: number = 15000,
+): Promise<void> {
+  /**
+   * USDC can display as either symbol 'USDC' or full name 'USD Coin'
+   * depending on tokenlist source. Try both variations.
+   */
+  const usdcVariations = ['USDC', 'USD Coin'];
+
+  for (const tokenName of usdcVariations) {
+    try {
+      console.log(
+        `[TEST] Attempting to find token as: "${tokenName}" (timeout: ${timeoutMs}ms)...`,
+      );
+      await assetListPage.checkTokenExistsInList(tokenName, undefined, {
+        timeout: timeoutMs,
+      });
+      console.log(`[TEST] ✅ Token found as: "${tokenName}"`);
+      return;
+    } catch (error) {
+      console.log(`[TEST] ⚠️  Token not found as: "${tokenName}". Trying next...`);
+      // Try next variation
+    }
+  }
+
+  // If we got here, no variations were found
+  throw new Error(
+    `USDC token not found under any variation: ${usdcVariations.join(', ')}. Timeout was ${timeoutMs}ms per attempt.`,
+  );
+}
+
 async function ensureBaseUsdcImported(driver: Driver): Promise<void> {
+  console.log('[TEST] ── Ensuring Base USDC is imported ──');
+
+  // Step 1: Switch to Base network
+  console.log('[TEST] Switching to Base network...');
   await switchToNetwork(driver, 'Base');
+  console.log('[TEST] Extended delay after network switch...');
+  await driver.delay(3000); // Extended delay to allow network context to settle
 
   const homePage = new HomePage(driver);
   const assetListPage = new AssetListPage(driver);
+
+  // Step 2: Navigate to tokens tab
+  console.log('[TEST] Navigating to tokens tab...');
+  await homePage.goToTokensTab();
+  console.log('[TEST] Waiting for token list to load...');
+  await driver.delay(PROD_DELAYS.API_RESPONSE * 2); // Extended delay for tab to fully load
+
+  // Step 3: Pre-check — Try to find USDC in current list (short timeout)
+  console.log(
+    '[TEST] Pre-check: Looking for USDC in asset list (short timeout)...',
+  );
+  try {
+    await verifyUsdcTokenInAssetList(assetListPage, 3000);
+    console.log('[TEST] ✅ USDC found in asset list. Import not needed.');
+    return;
+  } catch (_preCheckError) {
+    console.log(
+      '[TEST] ⚠️  USDC not found in asset list. Will proceed with import.',
+    );
+  }
+
+  // Step 4: Import USDC with metadata (symbol + decimals to skip RPC detection)
+  console.log(
+    '[TEST] Importing Base USDC token with metadata to skip slow RPC detection...',
+  );
+  let importSucceeded = false;
+  let importErrorMessage = '';
+
+  try {
+    // Pass symbol='USDC' and decimals='6' to skip RPC detection timeout
+    console.log('[TEST] Calling importCustomTokenByChain for USDC...');
+    await assetListPage.importCustomTokenByChain(
+      BASE_CHAIN_ID_HEX,
+      BASE_USDC_ADDRESS,
+      'USDC', // symbol
+      '6', // decimals
+    );
+    console.log('[TEST] ✅ USDC import completed successfully.');
+    importSucceeded = true;
+  } catch (importError: any) {
+    importErrorMessage = String(importError?.message || importError || '');
+    console.log('[TEST] Import error encountered:', importErrorMessage);
+
+    // Check if error indicates token already exists (acceptable outcome)
+    if (
+      importErrorMessage.includes('already been added') ||
+      importErrorMessage.includes('already exists') ||
+      importErrorMessage.includes('Token has already been added') ||
+      importErrorMessage.includes('Token with the same address already exists')
+    ) {
+      console.log(
+        '[TEST] ℹ️  USDC token already exists in wallet (import skipped). Continuing...',
+      );
+      importSucceeded = true;
+    } else {
+      console.error(
+        '[TEST] ❌ Unexpected error during import. Will proceed to verification anyway.',
+      );
+      // Don't throw yet — proceed to verification to see if token is actually present
+    }
+  }
+
+  // Step 5: Wait for import/UI to settle
+  console.log('[TEST] Waiting for import to complete and UI to refresh...');
+  await driver.delay(PROD_DELAYS.TOKEN_BALANCE_UPDATE * 2);
+
+  // Step 6: Ensure we're viewing tokens on Base network by refreshing the view
+  console.log(
+    '[TEST] Refreshing token list view to ensure fresh state...',
+  );
   await homePage.goToTokensTab();
   await driver.delay(PROD_DELAYS.API_RESPONSE);
 
+  // Step 7: Try to expand low-value assets in case USDC is hidden there
+  console.log('[TEST] Attempting to expand low-value assets...');
   try {
-    await assetListPage.checkTokenExistsInList('USDC');
-    return;
+    const expandButton = 'button[data-testid="account-overview__expand-button"]';
+    const isPresent = await driver.isElementPresentAndVisible(expandButton, 1000);
+    if (isPresent) {
+      console.log('[TEST] Expanding low-value assets section...');
+      await driver.clickElement(expandButton);
+      await driver.delay(1000);
+    }
   } catch (_error) {
-    // Token is not visible yet; import it by known Base mainnet contract.
+    console.log('[TEST] ℹ️  Low-value assets expansion not available (OK)');
   }
 
-  console.log('[TEST] Importing Base USDC token...');
-  await assetListPage.importCustomTokenByChain(
-    BASE_CHAIN_ID_HEX,
-    BASE_USDC_ADDRESS,
+  // Step 8: Post-import verification with extended timeout and retry logic
+  console.log(
+    '[TEST] Verifying USDC is visible in asset list (extended timeout with retries)...',
   );
-  await driver.delay(PROD_DELAYS.TOKEN_BALANCE_UPDATE);
-  await assetListPage.checkTokenExistsInList('USDC');
+  let verificationAttempt = 0;
+  const maxVerificationAttempts = 5; // Increased from 3 to 5
+  let lastVerificationError: any = null;
+
+  while (verificationAttempt < maxVerificationAttempts) {
+    try {
+      verificationAttempt++;
+      console.log(
+        `[TEST] Verification attempt ${verificationAttempt}/${maxVerificationAttempts}...`,
+      );
+
+      // Use verifyUsdcTokenInAssetList which checks both symbol and name
+      await verifyUsdcTokenInAssetList(assetListPage, 15000);
+      console.log('[TEST] ✅ USDC successfully verified in asset list.');
+      return;
+    } catch (verificationError: any) {
+      lastVerificationError = verificationError;
+      console.warn(
+        `[TEST] ⚠️  Verification attempt ${verificationAttempt} failed.`,
+      );
+
+      if (verificationAttempt < maxVerificationAttempts) {
+        console.log(
+          `[TEST] Retrying... (${maxVerificationAttempts - verificationAttempt} attempts remaining)`,
+        );
+        // Longer wait between retries
+        await driver.delay(3000);
+
+        // Refresh the asset list view
+        console.log('[TEST] Refreshing asset list...');
+        await homePage.goToTokensTab();
+        await driver.delay(PROD_DELAYS.API_RESPONSE);
+      }
+    }
+  }
+
+  // If we got here, all verification attempts failed
+  const finalErrorMsg = `Failed to verify Base USDC after ${maxVerificationAttempts} verification attempts. Import result: ${
+    importSucceeded ? 'SUCCESS' : 'FAILED'
+  }. Last verification error: ${
+    lastVerificationError?.message || lastVerificationError
+  }${importErrorMessage ? `. Import error: ${importErrorMessage}` : ''}`;
+
+  console.error('[TEST] ❌', finalErrorMsg);
+  throw new Error(finalErrorMsg);
 }
 
 async function assertNoInsufficientFunds(
@@ -482,7 +639,9 @@ describe('Production E2E: Popular Network Bridge Execution', function (this: Sui
         await loginWithoutBalanceValidation(driver);
         const homePage = new HomePage(driver);
         await homePage.checkPageIsLoaded();
-        await driver.delay(PROD_DELAYS.API_RESPONSE);
+        // Extended delay to ensure wallet fully syncs and initializes
+        console.log('[TEST] Waiting for wallet to fully sync and initialize...');
+        await driver.delay(PROD_DELAYS.API_RESPONSE * 3);
 
         console.log('[TEST] Importing funded account (PRIVATE_KEY_FROM)...');
         const privateKeyFrom = getRequiredE2EEnv('PRIVATE_KEY_FROM');

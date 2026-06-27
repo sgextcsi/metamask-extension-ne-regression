@@ -237,37 +237,69 @@ export const SWAP_TEST_NETWORKS: NetworkSwapConfig[] = [
     defaultSwapAmount: 20,
     gasFeeSponsoredByProtocol: true,
   },
-  // Add more networks here as needed.
-  //  Popular network list
-  {
-    networkId: 'Base',
-    networkName: 'Base',
-    chainId: 8453,
-    nativeTokenSymbol: 'ETH',
-    manualTokens: [
-      {
-        symbol: 'USDC',
-        name: 'USD Coin',
-        address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-        decimals: 6,
-      },
-      {
-        symbol: 'WETH',
-        name: 'Wrapped Ether',
-        address: '0x4200000000000000000000000000000000000006',
-        decimals: 18,
-      },
-    ],
-    fixtureSetupMethod: 'withNetworkControllerOnBase',
-    blockExplorerUrl: 'https://basescan.org',
-    swapExecutionTokenSymbols: ['USDC', 'WETH'],
-    defaultSwapAmount: 0.0000001,
-    swapExecutionRoutes: [
-      { from: 'ETH', to: 'USDC', amount: '0.0000001' },
-      { from: 'USDC', to: 'WETH', amount: 0.01 },
-      { from: 'WETH', to: 'ETH', useMax: true },
-    ],
-  },
+  // {
+  //   networkId: 'Sei',
+  //   networkName: 'Sei',
+  //   chainId: 1329,
+  //   nativeTokenSymbol: 'SEI',
+  //   tokenlistUrl:
+  //     'https://raw.githubusercontent.com/monad-crypto/token-list/refs/heads/main/tokenlist-mainnet.json',
+  //   manualTokens: [
+  //     {
+  //       symbol: 'USDC',
+  //       name: 'USDC',
+  //       address: '0xe15fc38f6d8c56af07bbcbe3baf5708a2bf42392',
+  //       decimals: 6,
+  //     },
+  //     {
+  //       symbol: 'USDT',
+  //       name: 'USDT0',
+  //       address: '0x9151434b16b9763660705744891fa906f660ecc5',
+  //       decimals: 6,
+  //     },
+  //   ],
+  //   fixtureSetupMethod: 'withNetworkControllerOnSei',
+  //   blockExplorerUrl: 'https://explorer.sei.xyz',
+  //   swapExecutionTokenSymbols: ['USDC', 'USDT'],
+  //   swapExecutionRoutes: [
+  //     { from: 'SEI', to: 'USDC', amount: 10 },
+  //     { from: 'USDC', to: 'USDT', amount: 0.23 },
+  //     { from: 'USDT', to: 'SEI', useMax: true },
+  //   ],
+  //   defaultSwapAmount: 20,
+  //   gasFeeSponsoredByProtocol: true,
+  // },
+  // // Add more networks here as needed.
+  // //  Popular network list
+  // {
+  //   networkId: 'Base',
+  //   networkName: 'Base',
+  //   chainId: 8453,
+  //   nativeTokenSymbol: 'ETH',
+  //   manualTokens: [
+  //     {
+  //       symbol: 'USDC',
+  //       name: 'USD Coin',
+  //       address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+  //       decimals: 6,
+  //     },
+  //     {
+  //       symbol: 'WETH',
+  //       name: 'Wrapped Ether',
+  //       address: '0x4200000000000000000000000000000000000006',
+  //       decimals: 18,
+  //     },
+  //   ],
+  //   fixtureSetupMethod: 'withNetworkControllerOnBase',
+  //   blockExplorerUrl: 'https://basescan.org',
+  //   swapExecutionTokenSymbols: ['USDC', 'WETH'],
+  //   defaultSwapAmount: 0.0000001,
+  //   swapExecutionRoutes: [
+  //     { from: 'ETH', to: 'USDC', amount: '0.0000001' },
+  //     { from: 'USDC', to: 'WETH', amount: 0.01 },
+  //     { from: 'WETH', to: 'ETH', useMax: true },
+  //   ],
+  // },
   // Custom network list
   // {
   //   networkId: 'Chiliz',

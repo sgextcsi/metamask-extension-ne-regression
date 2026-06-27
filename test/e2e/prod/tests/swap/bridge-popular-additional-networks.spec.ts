@@ -1,15 +1,20 @@
 /**
- * Production E2E Test: Monad Network Swap Execution
+ * Production E2E Test: Cross-Chain Bridge Execution
  *
- * Submits live swap transactions across a predefined sequence of routes,
- * verifies each route results in a confirmed activity entry, asserts the
- * detail-page values, and generates a simple markdown execution report.
+ * Submits live bridge transactions across a predefined sequence of routes,
+ * verifies each route results in a confirmed activity entry on the destination
+ * chain, asserts the detail-page values, and generates a simple markdown
+ * execution report.
  *
- * Routes tested (Monad):  MON → AUSD → AZND → BTC.b → MON
+ * Routes tested (Monad ↔ Base):
+ * 1. MON(Monad) → ETH(Base) -- Native to Native
+ * 2. ETH(Base) → AZND(Monad) -- Native to ERC-20
+ * 3. AZND(Monad) → USDC(Base) -- ERC-20 to ERC-20
+ * 4. USDC(Base) → MON(Monad) -- ERC-20 to Native
  *
  * Prerequisites:
- * - PRIVATE_KEY_TO in .env.e2e (funded account with Monad-native MON)
- * - Real network connectivity to Monad RPC
+ * - PRIVATE_KEY_FROM in .env.e2e (funded account with balance on source chains)
+ * - Real network connectivity to Monad and Base RPCs
  */
 
 import { Suite } from 'mocha';
@@ -22,41 +27,30 @@ import NetworkManager from '../../../page-objects/pages/network-manager';
 import { Driver } from '../../../webdriver/driver';
 import { getRequiredE2EEnv } from '../../../helpers/e2e-env';
 import {
-  SWAP_TEST_NETWORKS,
-  DEFAULT_SWAP_AMOUNT,
+  BRIDGE_TEST_NETWORKS,
+  DEFAULT_BRIDGE_AMOUNT,
   Token,
-  SwapRouteResult,
-  SwapValidationResult,
-} from './network-swap-config';
+  BridgeRouteResult,
+  BridgeValidationResult,
+} from './network-bridge-config';
 import {
-  importTokensFromTokenlist,
-  importTokensIntoWallet,
-  performSwapFlow,
-} from './swap-quotation-helpers';
-import {
-  resolveTokensBySymbols,
-  importSingleFundedAccount,
-  ensureLowValueAssetsExpanded,
-  waitForSwapQuoteReady,
-  assertCtaFeeText,
-  captureSwapAmounts,
-  submitSwapAndWaitForConfirmed,
-  assertActivityPrimaryCurrency,
-  assertActivitySecondaryCurrency,
-  openLatestSwapActivityRecord,
-  assertSwapDetailConfirmed,
-  assertDetailRow,
-  validateDetailRowAmountAtPrecision,
-  assertSwappedTokenPair,
-  assertTransactionTimestamp,
-  assertTotalGasFeeRow,
-  handleInsufficientFundsIfPresent,
-  navigateBackToHome,
-  recoverToHome,
-  generateSwapExecutionReport,
-  logSwapDetailPageContent,
-  validateSwapActivityPageFields,
-} from './swap-execution-helpers';
+  resolveBridgeTokensBySymbols,
+  importSingleFundedAccountForBridge,
+  enterBridgeFlow,
+  fillBridgeRouteDetails,
+  waitForBridgeQuoteReady,
+  captureBridgeAmounts,
+  submitBridgeAndWaitForConfirmed,
+  openLatestBridgeActivityRecord,
+  navigateBackToHomeForBridge,
+  recoverToHomeForBridge,
+  generateBridgeExecutionReport,
+  switchToDestinationNetwork,
+  verifyBridgeActivityOnDestination,
+  prepareForNextRoute,
+  ensureLowValueAssetsExpandedForBridge,
+  validateBridgeActivityPageFields,
+} from './bridge-execution-helpers';
 
 function getCliOptionValue(optionName: string): string | undefined {
   const prefixedOption = `--${optionName}`;
@@ -85,10 +79,10 @@ function parseNetworkNames(value?: string): string[] {
 
 async function selectNetworkViaHomeSelector(
   driver: Driver,
-  chainHexId: string,
+  chainId: number,
 ): Promise<void> {
   const networksListButton = '[data-testid="sort-by-networks"]';
-  const networkListItemSelector = `[data-testid="network-list-item-${chainHexId}"]`;
+  const networkListItemSelector = `[data-testid="network-list-item-eip155:${chainId}"]`;
 
   const maxAttempts = 3;
   let lastError: unknown;
@@ -116,7 +110,7 @@ async function selectNetworkViaHomeSelector(
       }
 
       console.log(
-        `[TEST] Network selector click intercepted (attempt ${attempt}/${maxAttempts}). Closing overlay and retrying...`,
+        `[BRIDGE] Network selector click intercepted (attempt ${attempt}/${maxAttempts}). Closing overlay and retrying...`,
       );
       await dismissBlockingOverlays(driver);
       await driver.delay(1000);
@@ -156,15 +150,15 @@ async function dismissBlockingOverlays(driver: Driver): Promise<void> {
 }
 
 /**
- * Production E2E Test: Monad Swap Execution
+ * Production E2E Test: Cross-Chain Bridge Execution
  *
- * Configuration is driven by SWAP_TEST_NETWORKS — only networks with
- * `swapExecutionRoutes` defined will run. Currently: Monad only.
+ * Configuration is driven by BRIDGE_TEST_NETWORKS — only networks with
+ * `bridgeExecutionRoutes` defined will run.
  */
-describe('Production E2E: Network Swap Execution', function (this: Suite) {
+describe('Production E2E: Cross-Chain Bridge Execution', function (this: Suite) {
   this.timeout(900000); // 15 minutes total for all routes
 
-  // Accept networks from CLI (`--network Base`, `--networks Base,Monad`) or
+  // Accept networks from CLI (`--network Monad`, `--networks Monad,Base`) or
   // env vars (`NETWORK`, `NETWORKS`). If not provided, run all networks.
   const networksFromCli =
     getCliOptionValue('network') ??
@@ -174,30 +168,30 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
     networksFromCli ?? process.env.NETWORK ?? process.env.NETWORKS,
   );
   const selectedNetworks = selectedNetworkNames.length
-    ? SWAP_TEST_NETWORKS.filter((config) =>
+    ? BRIDGE_TEST_NETWORKS.filter((config) =>
         selectedNetworkNames.some(
           (name) =>
             config.networkName.toLowerCase() === name.toLowerCase() ||
             config.networkId.toLowerCase() === name.toLowerCase(),
         ),
       )
-    : SWAP_TEST_NETWORKS;
+    : BRIDGE_TEST_NETWORKS;
 
   if (selectedNetworkNames.length > 0 && selectedNetworks.length === 0) {
     throw new Error(
-      `No matching swap network configurations found for: ${selectedNetworkNames.join(', ')}`,
+      `No matching bridge network configurations found for: ${selectedNetworkNames.join(', ')}`,
     );
   }
 
   selectedNetworks.forEach((networkConfig) => {
-    if (!networkConfig.swapExecutionRoutes?.length) {
+    if (!networkConfig.bridgeExecutionRoutes?.length) {
       return; // skip networks not yet configured for execution tests
     }
 
     describe(`Network: ${networkConfig.networkName}`, function (this: Suite) {
-      it(`should execute swap routes for ${networkConfig.nativeTokenSymbol}`, async function () {
+      it(`should execute bridge routes for ${networkConfig.nativeTokenSymbol}`, async function () {
         // Collect per-route results for the final markdown report
-        const routeResults: SwapRouteResult[] = [];
+        const routeResults: BridgeRouteResult[] = [];
         const fixtureBuilder = new FixtureBuilder();
         const setupMethod =
           fixtureBuilder[
@@ -217,46 +211,46 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
               .build(),
             title:
               this.test?.fullTitle() ||
-              `Swap execution test for ${networkConfig.networkName}`,
+              `Bridge execution test for ${networkConfig.networkName}`,
             extendedTimeoutMultiplier: 2,
           },
           async ({ driver }: { driver: Driver }) => {
             console.log(`\n${'='.repeat(80)}`);
             console.log(
-              `[TEST] Starting swap execution test for ${networkConfig.networkName}`,
+              `[BRIDGE] Starting bridge execution test for ${networkConfig.networkName}`,
             );
             console.log(`${'='.repeat(80)}\n`);
 
             // ----------------------------------------------------------------
             // Step 1: Login
             // ----------------------------------------------------------------
-            console.log(`[TEST] Logging in to wallet...`);
+            console.log(`[BRIDGE] Logging in to wallet...`);
             await loginWithoutBalanceValidation(driver);
             const homePage = new HomePage(driver);
             await homePage.checkPageIsLoaded();
             await driver.delay(PROD_DELAYS.API_RESPONSE);
-            console.log(`[TEST] ✅ Logged in`);
+            console.log(`[BRIDGE] ✅ Logged in`);
 
             // ----------------------------------------------------------------
             // Step 2: Select network
             // ----------------------------------------------------------------
             console.log(
-              `[TEST] Selecting ${networkConfig.networkName} network...`,
+              `[BRIDGE] Selecting ${networkConfig.networkName} network...`,
             );
 
-            // Prefer the home network selector (same pattern as send custom
-            // parameterized tests), and fall back to NetworkManager for
-            // backwards compatibility when the selector entry is not present.
+            // Prefer the home network selector, and fall back to NetworkManager
+            // for backwards compatibility when the selector entry is not present.
             try {
               await selectNetworkViaHomeSelector(driver, networkConfig.chainId);
             } catch (homeSelectorError) {
               console.log(
-                `[TEST] Home selector network switch failed, falling back to NetworkManager: ${String(homeSelectorError)}`,
+                `[BRIDGE] Home selector network switch failed, falling back to NetworkManager: ${String(homeSelectorError)}`,
               );
 
               await dismissBlockingOverlays(driver);
               const networkManager = new NetworkManager(driver);
               await networkManager.openNetworkManager();
+              // await networkManager.selectTab('Popular');
               await networkManager.selectNetworkByNameWithWait(
                 networkConfig.networkName,
               );
@@ -265,31 +259,36 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
             await homePage.checkPageIsLoaded();
             await driver.delay(PROD_DELAYS.API_RESPONSE);
             console.log(
-              `[TEST] ✅ Network selected: ${networkConfig.networkName}`,
+              `[BRIDGE] ✅ Network selected: ${networkConfig.networkName}`,
             );
 
             // ----------------------------------------------------------------
             // Step 3: Import funded account
-            // PRIVATE_KEY_FROM holds the account that has balance for swaps.
+            // PRIVATE_KEY_FROM holds the account that has balance for bridges.
             // This does NOT import the entire wallet — it adds one funded
             // account to the existing MetaMask instance.
             // ----------------------------------------------------------------
-            console.log(`[TEST] Importing funded account (PRIVATE_KEY_FROM)...`);
+            console.log(
+              `[BRIDGE] Importing funded account (PRIVATE_KEY_FROM)...`,
+            );
             const privateKeyFrom = getRequiredE2EEnv('PRIVATE_KEY_FROM');
-            await importSingleFundedAccount(driver, privateKeyFrom);
-            console.log(`[TEST] ✅ Funded account imported and active`);
+            await importSingleFundedAccountForBridge(driver, privateKeyFrom);
+            console.log(`[BRIDGE] ✅ Funded account imported and active`);
+
+            // ----------------------------------------------------------------
+            // Step 4a: Ensure low-value assets are expanded
+            // ----------------------------------------------------------------
+            await ensureLowValueAssetsExpandedForBridge(driver);
 
             // ----------------------------------------------------------------
             // Step 4: Resolve ERC-20 tokens to import.
-            // When manualTokens is provided the config supplies exact contract
-            // addresses — no tokenlist fetch is needed.  Otherwise tokens are
-            // fetched from tokenlistUrl and resolved by symbol.
+            // Manual tokens supply exact contract addresses directly.
             // ----------------------------------------------------------------
             let resolvedTokens: Token[];
 
             if (networkConfig.manualTokens?.length) {
               console.log(
-                `[TEST] Using manual token list for ${networkConfig.networkName}...`,
+                `[BRIDGE] Using manual token list for ${networkConfig.networkName}...`,
               );
               resolvedTokens = networkConfig.manualTokens.map((mt) => ({
                 chainId: networkConfig.chainId,
@@ -300,44 +299,15 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
               }));
             } else {
               console.log(
-                `[TEST] Fetching tokenlist for ${networkConfig.networkName}...`,
+                `[BRIDGE] No manual tokens configured for ${networkConfig.networkName}`,
               );
-              const tokenlistTokens = await importTokensFromTokenlist(
-                networkConfig.tokenlistUrl as string,
-                networkConfig.chainId,
-                50, // fetch up to 50 tokens so we can find symbols by name
-              );
-              const executionSymbols =
-                networkConfig.swapExecutionTokenSymbols ?? [];
-              resolvedTokens = resolveTokensBySymbols(
-                tokenlistTokens,
-                executionSymbols,
-              );
+              resolvedTokens = [];
             }
 
-            console.log(
-              `[TEST] Resolved ${resolvedTokens.length} execution tokens: ${resolvedTokens.map((t) => t.symbol).join(', ')}`,
-            );
-
-            await importTokensIntoWallet(
-              driver,
-              networkConfig.chainId,
-              resolvedTokens,
-            );
-            console.log(`[TEST] ✅ ERC-20 tokens imported into wallet`);
-
-            // Ensure low-value assets section is expanded (if collapsed after import)
-            try {
-              console.log('[TEST] Waiting for token list to load after import...');
-              await driver.waitForSelector(
-                '[data-testid="multichain-token-list-button"]',
-                { timeout: 10000 },
+            if (resolvedTokens.length > 0) {
+              console.log(
+                `[BRIDGE] Resolved ${resolvedTokens.length} execution tokens: ${resolvedTokens.map((t) => t.symbol).join(', ')}`,
               );
-              await driver.delay(500);
-              await ensureLowValueAssetsExpanded(driver);
-            } catch (toggleError) {
-              console.warn('[TEST] ⚠️  Could not ensure toggle expanded after import:', toggleError);
-              // Continue anyway - not critical
             }
 
             // Build symbol → token lookup for address resolution
@@ -346,28 +316,62 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
             );
 
             // ----------------------------------------------------------------
-            // Step 5: Execute each route sequentially.
+            // Step 5: Execute each bridge route sequentially.
             // Amounts are route-configured (`route.amount`) unless `useMax`
             // is enabled for that route.
             // ----------------------------------------------------------------
-            // swapExecutionRoutes is guaranteed non-empty (checked by the
-            // outer guard: `if (!networkConfig.swapExecutionRoutes?.length)`)
-            const executionRoutes = networkConfig.swapExecutionRoutes ?? [];
+            // bridgeExecutionRoutes is guaranteed non-empty (checked by the
+            // outer guard: `if (!networkConfig.bridgeExecutionRoutes?.length)`)
+            const executionRoutes = networkConfig.bridgeExecutionRoutes ?? [];
 
             for (const route of executionRoutes) {
-              const { from: fromSymbol, to: toSymbol, amount, useMax } = route;
-              const routeLabel = `${fromSymbol} → ${toSymbol}`;
+              const {
+                fromChain,
+                fromChainId,
+                fromToken: fromSymbol,
+                toChain,
+                toChainId,
+                toToken: toSymbol,
+                amount,
+                useMax,
+                disableRoute,
+              } = route;
+              const routeLabel = `${fromSymbol}(${fromChain}) → ${toSymbol}(${toChain})`;
+
+              // Skip this route if disableRoute is true
+              if (disableRoute) {
+                console.log(
+                  `[BRIDGE] ⏭️ Route skipped: ${routeLabel} (disableRoute: true)`,
+                );
+                routeResults.push({
+                  route: routeLabel,
+                  fromChain,
+                  fromToken: fromSymbol,
+                  toChain,
+                  toToken: toSymbol,
+                  toChainId,
+                  fromAmount: '-',
+                  toAmount: '-',
+                  validations: [{ name: 'Route disabled', status: 'passed' }],
+                  status: 'skipped',
+                });
+                continue;
+              }
+
               const plannedFromAmount = String(
                 amount ??
-                  networkConfig.defaultSwapAmount ??
-                  DEFAULT_SWAP_AMOUNT,
+                  networkConfig.defaultBridgeAmount ??
+                  DEFAULT_BRIDGE_AMOUNT,
               );
               const useMaxForRoute = Boolean(useMax);
 
-              const routeResult: SwapRouteResult = {
+              const routeResult: BridgeRouteResult = {
                 route: routeLabel,
-                fromSymbol,
-                toSymbol,
+                fromChain,
+                fromToken: fromSymbol,
+                toChain,
+                toToken: toSymbol,
+                toChainId,
                 fromAmount: '',
                 toAmount: '',
                 validations: [],
@@ -376,143 +380,93 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
 
               const recordValidation = (
                 name: string,
-                status: SwapValidationResult['status'],
+                status: BridgeValidationResult['status'],
                 details?: string,
               ) => {
                 routeResult.validations?.push({ name, status, details });
               };
 
-              // Resolve destination address.
-              // For native token destination, use the symbol as the picker
-              // search term (no contract address needed).
-              const isToNative = toSymbol === networkConfig.nativeTokenSymbol;
-              const destinationAddress = isToNative
-                ? toSymbol
-                : (tokenBySymbol.get(toSymbol)?.address ?? toSymbol);
-              const destinationTokenNetworkName = isToNative
-                ? networkConfig.networkName
-                : undefined;
-
-              console.log(`\n[TEST] ── Route: ${routeLabel} ──`);
+              console.log(`\n[BRIDGE] ── Route: ${routeLabel} ──`);
 
               try {
-                // -- Ensure low-value-assets toggle is expanded before each route --
-                try {
-                  console.log('[TEST] Ensuring low-value-assets toggle is expanded...');
+                // -- Ensure low-value assets are expanded before this route --
+                await ensureLowValueAssetsExpandedForBridge(driver);
 
-                  // After navigating back, we're on Activity Tab. Switch to Tokens/Asset Tab
-                  console.log('[TEST] Switching to Tokens/Asset Tab...');
-                  await driver.clickElement('[data-testid="account-overview__asset-tab"]');
-                  await driver.delay(1000);
-
-                  // Wait for token list to load (ensures DOM is ready)
-                  console.log('[TEST] Waiting for token list to load...');
-                  await driver.waitForSelector(
-                    '[data-testid="multichain-token-list-button"]',
-                    { timeout: 10000 },
-                  );
-                  console.log('[TEST] Token list loaded');
-                  await driver.delay(500);
-
-                  // Now call the helper to expand toggle if needed
-                  await ensureLowValueAssetsExpanded(driver);
-                } catch (toggleError) {
-                  console.warn('[TEST] ⚠️  Could not ensure toggle expanded:', toggleError);
-                  // Continue anyway - not critical
-                }
-
-                // -- Enter the swap page fresh from home for every route --
+                // -- Enter the bridge page fresh from home for every route --
                 console.log(
-                  `[TEST] Entering swap flow for route: ${routeLabel}`,
+                  `[BRIDGE] Entering bridge flow for route: ${routeLabel}`,
                 );
-                await performSwapFlow(driver, {
-                  sourceTokenSymbol: fromSymbol,
-                  sourceTokenName: tokenBySymbol.get(fromSymbol)?.name,
-                  networkName: networkConfig.networkName,
-                  destinationTokenAddress: destinationAddress,
-                  destinationTokenSymbol: toSymbol,
-                  destinationTokenNetworkName,
-                  fromAmount: plannedFromAmount,
-                  useMax: useMaxForRoute,
-                });
+                await enterBridgeFlow(
+                  driver,
+                  fromChain,
+                  fromSymbol,
+                  toChain,
+                  toSymbol,
+                );
+                recordValidation('Bridge flow entered', 'passed');
 
-                // -- Wait for quote and assert fee text --
-                // -- Check for ""Insufficient funds"" and auto-reduce to 75% --
-                // Skip for Max routes (the Max button already uses full available balance).
-                if (!useMaxForRoute) {
-                  const reducedAmount = await handleInsufficientFundsIfPresent(
-                    driver,
-                    plannedFromAmount,
-                  );
-                  if (reducedAmount !== undefined) {
-                    console.log(
-                      `[TEST] ⚠️  Insufficient funds — amount reduced to ${reducedAmount}`,
-                    );
-                  }
-                }
+                // -- Fill bridge route details --
+                await fillBridgeRouteDetails(
+                  driver,
+                  fromSymbol,
+                  plannedFromAmount,
+                  toSymbol,
+                  useMaxForRoute,
+                  fromChainId,
+                  toChainId,
+                );
+                recordValidation('Route details filled', 'passed');
 
-                // -- Wait for quote and assert fee text --
-                await waitForSwapQuoteReady(driver);
+                // -- Wait for quote and assert it's ready --
+                await waitForBridgeQuoteReady(driver);
                 recordValidation('Quote ready', 'passed');
-                await assertCtaFeeText(driver);
-                recordValidation('CTA fee text', 'passed');
 
                 // -- Capture amounts before submission --
                 const { fromAmount, toAmount } =
-                  await captureSwapAmounts(driver);
+                  await captureBridgeAmounts(driver);
                 routeResult.fromAmount = fromAmount;
                 routeResult.toAmount = toAmount;
+                recordValidation(
+                  'Amounts captured',
+                  'passed',
+                  `${fromAmount} → ${toAmount}`,
+                );
 
                 // -- Submit and wait for confirmed activity entry --
-                await submitSwapAndWaitForConfirmed(
+                await submitBridgeAndWaitForConfirmed(
                   driver,
                   fromSymbol,
                   toSymbol,
                 );
+                recordValidation('Bridge submitted and confirmed', 'passed');
 
-                // -- Assert activity list primary/secondary currency --
-                if (useMaxForRoute) {
-                  // Max swaps can render rounded/truncated activity amounts,
-                  // so validate by token symbol instead of exact raw amount.
-                  await assertActivityPrimaryCurrency(
-                    driver,
-                    `${fromSymbol}`,
-                  );
-                } else {
-                  await assertActivityPrimaryCurrency(
-                    driver,
-                    `-${fromAmount} ${fromSymbol}`,
-                  );
-                }
-                recordValidation(
-                  'Activity primary amount',
-                  'passed',
-                  useMaxForRoute
-                    ? `contains ${fromSymbol} (max route)`
-                    : `-${fromAmount} ${fromSymbol}`,
-                );
-                await assertActivitySecondaryCurrency(
+                // -- Switch to destination network for verification --
+                await switchToDestinationNetwork(driver, toChainId);
+                recordValidation('Switched to destination network', 'passed');
+
+                // -- Verify bridge activity on destination network --
+                await verifyBridgeActivityOnDestination(
                   driver,
-                  `-${toAmount} ""$""`,
+                  fromSymbol,
+                  toSymbol,
+                  toAmount,
                 );
                 recordValidation(
-                  'Activity secondary value',
+                  'Bridge activity verified on destination',
                   'passed',
-                  `-${toAmount} ""$""`,
                 );
 
-                // -- Open detail page and wait --
-                await openLatestSwapActivityRecord(
+                // -- Open detail page on destination --
+                await openLatestBridgeActivityRecord(
                   driver,
                   fromSymbol,
                   toSymbol,
                 );
+                recordValidation('Activity detail page opened on destination', 'passed');
 
-                await driver.delay(2000);
-
-                // -- Validate swap activity page fields --
-                console.log('[TEST] Validating swap activity page fields...');
-                const activityValidation = await validateSwapActivityPageFields(driver);
+                // -- Validate bridge activity page fields --
+                console.log('[BRIDGE] Validating bridge activity page fields...');
+                const activityValidation = await validateBridgeActivityPageFields(driver);
 
                 // Record all validations
                 recordValidation(
@@ -552,19 +506,22 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
                 );
 
                 if (activityValidation.warnings.length > 0) {
-                  console.warn(`[TEST] ⚠️  Activity validation had ${activityValidation.warnings.length} warning(s):`);
+                  console.warn(`[BRIDGE] ⚠️  Activity validation had ${activityValidation.warnings.length} warning(s):`);
                   activityValidation.warnings.forEach((w) => {
-                    console.warn(`[TEST]   - ${w}`);
+                    console.warn(`[BRIDGE]   - ${w}`);
                   });
                 } else {
-                  console.log('[TEST] ✅ All activity page fields validated successfully');
+                  console.log('[BRIDGE] ✅ All activity page fields validated successfully');
                 }
 
-                // -- Navigate back to home for next route --
-                await navigateBackToHome(driver);
+                // -- Prepare for next route (may need to switch networks) --
+                const nextRouteIndex = executionRoutes.indexOf(route) + 1;
+                const nextRoute = executionRoutes[nextRouteIndex];
+                await prepareForNextRoute(driver, nextRoute, toChain);
+                recordValidation('Prepared for next route', 'passed');
 
                 routeResult.status = 'passed';
-                console.log(`[TEST] ✅ Route passed: ${routeLabel}`);
+                console.log(`[BRIDGE] ✅ Route passed: ${routeLabel}`);
               } catch (error) {
                 routeResult.status = 'failed';
                 routeResult.error = String(error);
@@ -573,13 +530,13 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
                   'failed',
                   String(error),
                 );
-                console.error(`[TEST] ❌ Route failed: ${routeLabel}`);
+                console.error(`[BRIDGE] ❌ Route failed: ${routeLabel}`);
                 console.error(error);
 
-                const recovered = await recoverToHome(driver);
+                const recovered = await recoverToHomeForBridge(driver);
                 if (!recovered) {
                   console.error(
-                    `[TEST] Recovery failed after route ${routeLabel} — stopping suite`,
+                    `[BRIDGE] Recovery failed after route ${routeLabel} — stopping suite`,
                   );
                   routeResults.push(routeResult);
                   break;
@@ -593,10 +550,10 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
             // Step 6: Generate markdown execution report
             // ----------------------------------------------------------------
             try {
-              generateSwapExecutionReport(routeResults, networkConfig);
+              generateBridgeExecutionReport(routeResults, networkConfig);
             } catch (reportError) {
               console.warn(
-                `[TEST] ⚠️  Failed to generate report:`,
+                `[BRIDGE] ⚠️  Failed to generate report:`,
                 reportError,
               );
             }
@@ -607,7 +564,7 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
             );
             if (failedRoutes.length > 0) {
               throw new Error(
-                `${failedRoutes.length}/${routeResults.length} swap route(s) failed: ${failedRoutes
+                `${failedRoutes.length}/${routeResults.length} bridge route(s) failed: ${failedRoutes
                   .map((r) => r.route)
                   .join(', ')}`,
               );
