@@ -67,7 +67,7 @@ export type FeatureFlagRegistryEntry = {
  * Remote flag values are stored in the exact format returned by the production
  * client-config API, so they can be served directly by mock-e2e.js.
  *
- * Production defaults last synced: 2026-06-23
+ * Production defaults last synced: 2026-06-30
  * Source: https://client-config.api.cx.metamask.io/v1/flags?client=extension&distribution=main&environment=prod
  */
 export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
@@ -2148,8 +2148,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      minimumVersion: '0.0.0',
       enabled: true,
+      minimumVersion: '13.36.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2191,8 +2191,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
+      minimumVersion: '13.38.0',
       enabled: false,
-      minimumVersion: '13.36.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2213,8 +2213,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      minimumVersion: '0.0.0',
       enabled: false,
+      minimumVersion: '13.38.0',
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2293,8 +2293,8 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
     type: FeatureFlagType.Remote,
     inProd: true,
     productionDefault: {
-      enabled: false,
-      minimumVersion: '0.0.0',
+      minimumVersion: '13.36.0',
+      enabled: true,
     },
     status: FeatureFlagStatus.Active,
   },
@@ -2932,6 +2932,52 @@ export const FEATURE_FLAG_REGISTRY: Record<string, FeatureFlagRegistryEntry> = {
           },
         ],
       },
+    },
+    status: FeatureFlagStatus.Active,
+  },
+  bridgeQuoteStatusManager: {
+    name: 'bridgeQuoteStatusManager',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      versions: {},
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  confirmations_pay_hardware: {
+    name: 'confirmations_pay_hardware',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+    },
+    status: FeatureFlagStatus.Active,
+  },
+
+  corePlatformRpcFailoverMode: {
+    name: 'corePlatformRpcFailoverMode',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: 'enabled',
+    status: FeatureFlagStatus.Active,
+  },
+
+  extensionUxTransactionEventToast: {
+    name: 'extensionUxTransactionEventToast',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: false,
+    status: FeatureFlagStatus.Active,
+  },
+
+  perpsTerminalBackendEnabled: {
+    name: 'perpsTerminalBackendEnabled',
+    type: FeatureFlagType.Remote,
+    inProd: true,
+    productionDefault: {
+      enabled: false,
+      minimumVersion: '13.0.0',
     },
     status: FeatureFlagStatus.Active,
   },
