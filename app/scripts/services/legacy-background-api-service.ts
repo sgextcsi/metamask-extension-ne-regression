@@ -145,20 +145,17 @@ import {
 import { getIsAssetsUnifiedStateIncludedInBuild } from '../../../shared/lib/environment';
 import { getIsShieldSubscriptionActive } from '../../../shared/lib/shield/subscription-utils';
 import { DecodedTransactionDataResponse } from '../../../shared/types/transaction-decode';
+import { captureException } from '../../../shared/lib/sentry';
 import {
   ASSETS_UNIFY_STATE_VERSION_1,
   AssetsUnifyStateFeatureFlag,
   isAssetsUnifyStateFeatureEnabled as getIsAssetsUnifyStateFeatureEnabled,
 } from '../../../shared/lib/assets-unify-state/remote-feature-flag';
-import {
-  SMART_TRANSACTION_CONFIRMATION_TYPES,
-  SNAP_MANAGE_ACCOUNTS_CONFIRMATION_TYPES,
-} from '../../../shared/constants/app';
+import { SNAP_MANAGE_ACCOUNTS_CONFIRMATION_TYPES } from '../../../shared/constants/app';
 import {
   MetaMetricsEventCategory,
   MetaMetricsEventFragment,
 } from '../../../shared/constants/metametrics';
-import { isEqualCaseInsensitive } from '../../../shared/lib/string-utils';
 import { OnboardingControllerGetIsSocialLoginFlowAction } from '../controllers/onboarding-method-action-types';
 import { getAccountsBySnapId } from '../lib/snap-keyring';
 import { isSendBundleSupported } from '../lib/transaction/sentinel-api';
@@ -199,6 +196,7 @@ const serviceName = 'LegacyBackgroundApiService';
 const MESSENGER_EXPOSED_METHODS = [
   'acceptPermissionsRequest',
   'applyTransactionContainersExisting',
+  'captureTestError',
   'changePassword',
   'checkDelegationDisabled',
   'checkIsSeedlessPasswordOutdated',
@@ -707,53 +705,6 @@ export class LegacyBackgroundApiService {
     ).address;
 
     const globalChainId = this.getGlobalChainId();
-
-    const { pendingApprovals } = this.#messenger.call(
-      'ApprovalController:getState',
-    );
-
-    const { transactions } = this.#messenger.call(
-      'TransactionController:getState',
-    );
-
-    const matchingSmartTransactionApprovals = Object.values(
-      pendingApprovals ?? {},
-    ).filter((approval) => {
-      if (
-        approval.type !==
-        SMART_TRANSACTION_CONFIRMATION_TYPES.showSmartTransactionStatusPage
-      ) {
-        return false;
-      }
-
-      const txId = approval.requestState?.txId;
-
-      if (typeof txId !== 'string') {
-        return false;
-      }
-
-      const transaction = transactions.find(({ id }) => id === txId);
-
-      return (
-        transaction &&
-        transaction?.chainId === globalChainId &&
-        isEqualCaseInsensitive(transaction.txParams?.from, selectedAddress)
-      );
-    });
-
-    for (const approval of matchingSmartTransactionApprovals) {
-      try {
-        this.#messenger.call(
-          'ApprovalController:rejectRequest',
-          approval.id,
-          new Error('Transaction activity reset'),
-        );
-      } catch (error) {
-        if (!(error instanceof ApprovalRequestNotFoundError)) {
-          throw error;
-        }
-      }
-    }
 
     this.#messenger.call('TransactionController:wipeTransactions', {
       address: selectedAddress,
@@ -1747,6 +1698,21 @@ export class LegacyBackgroundApiService {
         throw error;
       }
     }
+  }
+
+  /**
+   * Capture an artificial error in a timeout handler for testing purposes.
+   *
+   * @param message - The error message.
+   * @deprecated This is only meant to facilitate manual and E2E tests testing. We should not
+   * use this for handling errors.
+   */
+  captureTestError(message: string): void {
+    setTimeout(() => {
+      const error = new Error(message);
+      error.name = 'TestError';
+      captureException(error);
+    });
   }
 
   /**

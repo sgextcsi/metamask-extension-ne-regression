@@ -347,6 +347,8 @@ import { GeolocationApiServiceInit } from './messenger-client-init/geolocation-a
 import { GeolocationControllerInit } from './messenger-client-init/geolocation-controller-init';
 import { ComplianceServiceInit } from './messenger-client-init/compliance-service-init';
 import { ComplianceControllerInit } from './messenger-client-init/compliance-controller-init';
+import { RampsServiceInit } from './messenger-client-init/ramps-service-init';
+import { RampsControllerInit } from './messenger-client-init/ramps-controller-init';
 import { PerpsControllerInit } from './messenger-client-init/perps-controller-init';
 import { PerpsStreamBridge } from './controllers/perps/perps-stream-bridge';
 import { PPOMControllerInit } from './messenger-client-init/confirmations/ppom-controller-init';
@@ -437,6 +439,7 @@ import { RewardsDataServiceInit } from './messenger-client-init/rewards-data-ser
 import { RewardsControllerInit } from './messenger-client-init/rewards-controller-init';
 import { PasskeyControllerInit } from './messenger-client-init/passkey-controller-init';
 import { QrSyncControllerInit } from './messenger-client-init/qr-sync-controller-init';
+import { QrSyncDataServiceInit } from './messenger-client-init/qr-sync-data-service-init';
 import { getRootMessenger } from './lib/messenger';
 import {
   ClaimsControllerInit,
@@ -666,6 +669,8 @@ export default class MetamaskController extends EventEmitter {
       GeolocationController: GeolocationControllerInit,
       ComplianceService: ComplianceServiceInit,
       ComplianceController: ComplianceControllerInit,
+      RampsService: RampsServiceInit,
+      RampsController: RampsControllerInit,
       ...(getIsPerpsIncludedInBuild()
         ? { PerpsController: PerpsControllerInit }
         : {}),
@@ -729,6 +734,7 @@ export default class MetamaskController extends EventEmitter {
       ProfileMetricsController: ProfileMetricsControllerInit,
       ProfileMetricsService: ProfileMetricsServiceInit,
       ProofOfOwnershipService: ProofOfOwnershipServiceInit,
+      QrSyncDataService: QrSyncDataServiceInit,
       QrSyncController: QrSyncControllerInit,
       // ClientController must be initialized before AssetsController (AssetsController subscribes to ClientController:stateChange).
       ClientController: ClientControllerInit,
@@ -754,6 +760,8 @@ export default class MetamaskController extends EventEmitter {
     this.controllerMemState = controllerMemState;
     this.controllerPersistedState = controllerPersistedState;
     this.messengerClientsByName = messengerClientsByName;
+
+    this.rampsController = messengerClientsByName.RampsController;
 
     // Backwards compatibility for existing references
     this.approvalController = this.wallet.getInstance('ApprovalController');
@@ -1715,6 +1723,10 @@ export default class MetamaskController extends EventEmitter {
           console.error(error);
         });
     }
+
+    if (this.preferencesController.state.useExternalServices) {
+      this.messengerClientApi.startRampsLifecycle?.();
+    }
   }
 
   /**
@@ -1757,6 +1769,9 @@ export default class MetamaskController extends EventEmitter {
           console.error(error);
         });
     }
+    if (this.preferencesController.state.useExternalServices) {
+      this.messengerClientApi.startRampsLifecycle?.();
+    }
   }
 
   stopNetworkRequests() {
@@ -1775,6 +1790,7 @@ export default class MetamaskController extends EventEmitter {
           console.error(error);
         });
     }
+    this.messengerClientApi.stopRampsLifecycle?.();
   }
 
   /**
@@ -1912,6 +1928,17 @@ export default class MetamaskController extends EventEmitter {
               ?.catch((error) => {
                 console.error(error);
               });
+          }
+        }
+        if (
+          prev !== curr &&
+          this.messengerClientApi.startRampsLifecycle &&
+          this.messengerClientApi.stopRampsLifecycle
+        ) {
+          if (curr) {
+            this.messengerClientApi.startRampsLifecycle?.();
+          } else {
+            this.messengerClientApi.stopRampsLifecycle?.();
           }
         }
         return true;
@@ -3876,7 +3903,10 @@ export default class MetamaskController extends EventEmitter {
         this.controllerMessenger,
         'LegacyBackgroundApiService:throwTestError',
       ),
-      captureTestError: this.captureTestError.bind(this),
+      captureTestError: this.controllerMessenger.call.bind(
+        this.controllerMessenger,
+        'LegacyBackgroundApiService:captureTestError',
+      ),
 
       // NameController
       updateProposedNames: this.nameController.updateProposedNames.bind(
@@ -8079,21 +8109,6 @@ export default class MetamaskController extends EventEmitter {
 
     releaseLock();
     return pendingNonce;
-  }
-
-  /**
-   * Capture an artificial error in a timeout handler for testing purposes.
-   *
-   * @param message - The error message.
-   * @deprecated This is only meant to facilitate manual and E2E tests testing. We should not
-   * use this for handling errors.
-   */
-  captureTestError(message) {
-    setTimeout(() => {
-      const error = new Error(message);
-      error.name = 'TestError';
-      captureException(error);
-    });
   }
 
   getTransactionUIMetricsFragmentId(transactionId) {
