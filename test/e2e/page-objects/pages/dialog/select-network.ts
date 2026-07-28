@@ -10,7 +10,7 @@ class SelectNetwork {
 
   private readonly addNetworkButton = '[data-testid="test-add-button"]';
 
-  private readonly closeButton = '[data-testid="settings-header-back-button"]';
+  private readonly closeButton = '[data-testid="page-header-back-button"]';
 
   private readonly confirmDeleteNetworkButton =
     '[data-testid="confirm-delete-network-modal-delete-button"]';
@@ -62,7 +62,8 @@ class SelectNetwork {
     tag: 'h4',
   };
 
-  private readonly showTestNetworksToggle = '.toggle-button';
+  private readonly showTestNetworksToggle =
+    'label.toggle-button:has([data-testid="networks-page-show-test-networks"])';
 
   private readonly addPopularNetworkByChainIdIcon = (chainId: string) =>
     `[data-testid="popular-network-${chainId}"] [data-testid="test-add-button"] button`;
