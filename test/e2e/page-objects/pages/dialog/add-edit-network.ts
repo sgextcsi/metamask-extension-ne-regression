@@ -2,8 +2,6 @@ import { strict as assert } from 'assert';
 import { Driver } from '../../../webdriver/driver';
 
 class AddEditNetworkModal {
-  private driver: Driver;
-
   private readonly addExplorerUrlButton = {
     text: 'Add a block explorer URL',
     tag: 'button',
@@ -25,12 +23,12 @@ class AddEditNetworkModal {
 
   private readonly backButton = '[data-testid="page-header-back-button"]';
 
+  private readonly chainIdInputError =
+    '[data-testid="network-form-chain-id-error"]';
+
   private readonly chainIdInputField = {
     testId: 'network-form-chain-id',
   };
-
-  private readonly chainIdInputError =
-    '[data-testid="network-form-chain-id-error"]';
 
   private readonly confirmAddExplorerUrlButton = {
     text: 'Add URL',
@@ -41,6 +39,8 @@ class AddEditNetworkModal {
 
   private readonly currencySymbolWarning =
     '[data-testid="network-form-ticker-suggestion"]';
+
+  private driver: Driver;
 
   private readonly editModalRpcDropDownButton =
     '[data-testid="test-add-rpc-drop-down"]';
@@ -69,6 +69,70 @@ class AddEditNetworkModal {
 
   constructor(driver: Driver) {
     this.driver = driver;
+  }
+
+  /**
+   * Add an explorer URL to the network.
+   *
+   * @param explorerUrl - The URL of the explorer to add.
+   */
+  async addExplorerUrl(explorerUrl: string): Promise<void> {
+    console.log(`Add explorer URL ${explorerUrl}`);
+    await this.driver.findScrollToAndClickElement(
+      this.explorerUrlInputDropDownButton,
+    );
+    await this.driver.clickElement(this.addExplorerUrlButton);
+    await this.driver.waitForSelector(this.addExplorerUrlTitle);
+    await this.driver.fill(this.addExplorerUrlInput, explorerUrl);
+    await this.driver.clickElementAndWaitToDisappear(
+      this.confirmAddExplorerUrlButton,
+    );
+  }
+
+  /**
+   * Check if the chain id input error message is displayed in the add/edit network modal.
+   *
+   * @param errorMessage - The error message to check.
+   */
+  async checkChainIdInputErrorMessageIsDisplayed(
+    errorMessage: string,
+  ): Promise<void> {
+    console.log(
+      `Check that chain id input error message ${errorMessage} is displayed`,
+    );
+    await this.driver.waitForSelector({
+      text: errorMessage,
+      css: this.chainIdInputError,
+    });
+  }
+
+  /**
+   * Checks if the chain id input field is enabled on edit network modal.
+   *
+   * @param shouldBeEnabled - Whether the chain id input field should be enabled. Defaults to true.
+   */
+  async checkChainIdInputFieldIsEnabled(
+    shouldBeEnabled: boolean = true,
+  ): Promise<void> {
+    console.log(
+      `Check that chain id input field is ${
+        shouldBeEnabled ? 'enabled' : 'disabled'
+      }`,
+    );
+    const chainIdInput = await this.driver.findElement(this.chainIdInputField);
+    assert.equal(await chainIdInput.isEnabled(), shouldBeEnabled);
+  }
+
+  async checkCurrencySymbolWarningIsDisplayed(
+    warningMessage: string,
+  ): Promise<void> {
+    console.log(
+      `Check that currency symbol warning ${warningMessage} is displayed`,
+    );
+    await this.driver.waitForSelector({
+      text: warningMessage,
+      css: this.currencySymbolWarning,
+    });
   }
 
   async checkPageIsLoaded(): Promise<void> {
@@ -119,21 +183,49 @@ class AddEditNetworkModal {
   }
 
   /**
-   * Add an explorer URL to the network.
+   * Check if an RPC is displayed or not in the RPC list in the edit network modal.
    *
-   * @param explorerUrl - The URL of the explorer to add.
+   * @param rpcName - The name of the RPC to check.
+   * @param shouldBeDisplayed - Whether the RPC should be displayed or not, default is true.
    */
-  async addExplorerUrl(explorerUrl: string): Promise<void> {
-    console.log(`Add explorer URL ${explorerUrl}`);
-    await this.driver.findScrollToAndClickElement(
-      this.explorerUrlInputDropDownButton,
+  async checkRpcIsDisplayed(
+    rpcName: string,
+    shouldBeDisplayed: boolean = true,
+  ): Promise<void> {
+    console.log(
+      `Check that RPC ${rpcName} is ${
+        shouldBeDisplayed ? '' : 'not '
+      } displayed on edit network modal`,
     );
-    await this.driver.clickElement(this.addExplorerUrlButton);
-    await this.driver.waitForSelector(this.addExplorerUrlTitle);
-    await this.driver.fill(this.addExplorerUrlInput, explorerUrl);
-    await this.driver.clickElementAndWaitToDisappear(
-      this.confirmAddExplorerUrlButton,
-    );
+    await this.driver.clickElement(this.editModalRpcDropDownButton);
+    if (shouldBeDisplayed) {
+      await this.driver.waitForSelector({
+        text: rpcName,
+        tag: 'p',
+      });
+    } else {
+      await this.driver.assertElementNotPresent({
+        text: rpcName,
+        tag: 'p',
+      });
+    }
+  }
+
+  async checkSaveButtonIsEnabled(): Promise<boolean> {
+    console.log('Check if save button is enabled on add/edit network modal');
+    try {
+      await this.driver.findClickableElement(this.editModalSaveButton);
+    } catch (e) {
+      console.log('Save button not enabled', e);
+      return false;
+    }
+    console.log('Save button is enabled');
+    return true;
+  }
+
+  async clickBackButton(): Promise<void> {
+    console.log('Click back button in add/edit network modal');
+    await this.driver.clickElementAndWaitToDisappear(this.backButton);
   }
 
   /**
@@ -189,81 +281,6 @@ class AddEditNetworkModal {
     console.log('Save and close edit network modal');
     const saveButtonSelector = await this.getSaveButtonSelector();
 
-    await this.driver.waitUntil(async () => {
-      const saveButton = await this.driver.findElement(saveButtonSelector);
-      return await saveButton.isEnabled();
-    }, {
-      interval: 200,
-      timeout: 10_000,
-    });
-
-    await this.driver.clickElement(saveButtonSelector);
-    await this.driver.assertElementNotPresent(this.networkNameInputField, {
-      waitAtLeastGuard: 300,
-      timeout: 20_000,
-    });
-
-    // Wait for success message toast to appear and auto-dismiss
-    // The success message "Network XYZ was successfully edited!" blocks interaction
-    console.log('[AddEditNetworkModal] Waiting for success message to appear and dismiss...');
-    await this.driver.delay(500); // Let the toast appear
-
-    // Wait for the success message to disappear (it auto-dismisses after ~2-3 seconds)
-    const successMessageSelector = '[data-testid="toast-notification"]';
-    const maxWaitTime = 5000;
-    const startTime = Date.now();
-    while (await this.driver.isElementPresentAndVisible(successMessageSelector)) {
-      if (Date.now() - startTime > maxWaitTime) {
-        console.log('[AddEditNetworkModal] Success message did not disappear within timeout, continuing anyway');
-        break;
-      }
-      await this.driver.delay(200);
-    }
-    console.log('[AddEditNetworkModal] Success message dismissed or timeout reached');
-
-    // In Settings V2, saving can return to the networks page instead of home.
-    // Preserve legacy flow expectation by navigating back to the wallet home page.
-    if (
-      await this.driver.isElementPresentAndVisible(this.settingsV2NetworksPageList)
-    ) {
-      if (networkName) {
-        const networkNameSelector = `[data-testid="${networkName}"]`;
-        if (await this.driver.isElementPresentAndVisible(networkNameSelector)) {
-          await this.driver.clickElement(networkNameSelector);
-        }
-      }
-
-      if (
-        await this.driver.isElementPresentAndVisible(this.settingsV2NetworksPageList)
-      ) {
-        console.log('Network list is visible, navigating back to wallet home page');
-        // Try clicking the back button first
-        let navigated = false;
-        try {
-          await this.driver.findClickableElement(this.settingsV2NetworksPageBackButton, {
-            timeout: 5_000,
-          });
-          await this.driver.clickElement(this.settingsV2NetworksPageBackButton);
-          navigated = true;
-          console.log('Navigated back via back button');
-        } catch (e) {
-          console.warn('[AddEditNetworkModal] Back button click failed, using navigation script');
-          // Fallback: use script-based navigation if button not found
-          await this.driver.executeScript(
-            `window.location.hash = ${JSON.stringify('/')}`,
-          );
-          navigated = true;
-        }
-        console.log('Navigated back to wallet home page');
-      }
-
-      await this.driver.assertElementNotPresent(this.settingsV2NetworksPageList, {
-        waitAtLeastGuard: 300,
-        timeout: 20_000,
-      });
-    }
-  }
-
   /**
    * Selects an RPC from the dropdown in the edit network modal.
    *
@@ -277,95 +294,6 @@ class AddEditNetworkModal {
       tag: 'button',
     });
     await this.saveEditedNetwork();
-  }
-
-  /**
-   * Checks if the chain id input field is enabled on edit network modal.
-   *
-   * @param shouldBeEnabled - Whether the chain id input field should be enabled. Defaults to true.
-   */
-  async checkChainIdInputFieldIsEnabled(
-    shouldBeEnabled: boolean = true,
-  ): Promise<void> {
-    console.log(
-      `Check that chain id input field is ${
-        shouldBeEnabled ? 'enabled' : 'disabled'
-      }`,
-    );
-    const chainIdInput = await this.driver.findElement(this.chainIdInputField);
-    assert.equal(await chainIdInput.isEnabled(), shouldBeEnabled);
-  }
-
-  /**
-   * Check if the chain id input error message is displayed in the add/edit network modal.
-   *
-   * @param errorMessage - The error message to check.
-   */
-  async checkChainIdInputErrorMessageIsDisplayed(
-    errorMessage: string,
-  ): Promise<void> {
-    console.log(
-      `Check that chain id input error message ${errorMessage} is displayed`,
-    );
-    await this.driver.waitForSelector({
-      text: errorMessage,
-      css: this.chainIdInputError,
-    });
-  }
-
-  async checkCurrencySymbolWarningIsDisplayed(
-    warningMessage: string,
-  ): Promise<void> {
-    console.log(
-      `Check that currency symbol warning ${warningMessage} is displayed`,
-    );
-    await this.driver.waitForSelector({
-      text: warningMessage,
-      css: this.currencySymbolWarning,
-    });
-  }
-
-  /**
-   * Check if an RPC is displayed or not in the RPC list in the edit network modal.
-   *
-   * @param rpcName - The name of the RPC to check.
-   * @param shouldBeDisplayed - Whether the RPC should be displayed or not, default is true.
-   */
-  async checkRpcIsDisplayed(
-    rpcName: string,
-    shouldBeDisplayed: boolean = true,
-  ): Promise<void> {
-    console.log(
-      `Check that RPC ${rpcName} is ${
-        shouldBeDisplayed ? '' : 'not '
-      } displayed on edit network modal`,
-    );
-    await this.driver.clickElement(this.editModalRpcDropDownButton);
-    if (shouldBeDisplayed) {
-      await this.driver.waitForSelector({
-        text: rpcName,
-        tag: 'p',
-      });
-    } else {
-      await this.driver.assertElementNotPresent({
-        text: rpcName,
-        tag: 'p',
-      });
-    }
-  }
-
-  async checkSaveButtonIsEnabled(): Promise<boolean> {
-    console.log('Check if save button is enabled on add/edit network modal');
-    try {
-      await this.driver.findClickableElement(this.editModalSaveButton, {
-        timeout: 1000,
-      });
-    } catch (e) {
-      console.log('Save button not enabled', e);
-      return false;
-    }
-    console.log('Save button is enabled');
-    return true;
   }
 }
 
