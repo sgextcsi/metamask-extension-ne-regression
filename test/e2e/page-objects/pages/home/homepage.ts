@@ -24,7 +24,7 @@ const NON_EVM_ICON_TIMEOUT = 20_000;
 
 class HomePage {
   protected readonly activityTab = {
-    testId: 'account-overview__activity-tab',
+    testId: 'bottom-nav-activity',
   };
 
   private readonly backupRemindMeLaterButton = {
@@ -609,14 +609,14 @@ class HomePage {
           const callback = arguments[arguments.length - 1];
           const maxAttempts = 50;
           let attempts = 0;
-  
+
           const checkReduxReady = () => {
             attempts++;
-  
+
             if (window.stateHooks?.getCleanAppState) {
               try {
                 const state = window.stateHooks.getCleanAppState();
-  
+
                 if (state && typeof state === 'object') {
                   if (state.metamask && typeof state.metamask === 'object') {
                     console.log('Redux state is ready');
@@ -628,7 +628,7 @@ class HomePage {
                 console.log('Redux state not ready yet, attempt ' + attempts);
               }
             }
-  
+
             if (attempts >= maxAttempts) {
               console.log('Redux state check timeout, continuing anyway');
               callback();

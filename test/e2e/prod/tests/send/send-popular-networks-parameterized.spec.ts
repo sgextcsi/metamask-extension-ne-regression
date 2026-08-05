@@ -418,7 +418,7 @@ async function runNetworkSendTest(
     console.log(
       `[PROD TEST] Filling recipient address (Account 1) for ${networkName}: ${recipientAddress}`,
     );
-    await sendPage.fillRecipient(recipientAddress);
+    await sendPage.fillRecipient({ recipientAddress: recipientAddress });
 
     // Fill amount
     console.log(
@@ -471,6 +471,7 @@ async function runNetworkSendTest(
       'success',
     );
 
+    await driver.clickElement('[data-testid="bottom-nav-home"]');
     // ============================================
     // STEP 4: Switch to Account 1 and verify received balance
     // ============================================
@@ -574,6 +575,8 @@ async function runNetworkSendTest(
       'success',
     );
 
+    await driver.clickElement('[data-testid="bottom-nav-home"]');
+
     // ============================================
     // STEP 5: Send from Account 1 back to Account 2
     // ============================================
@@ -605,7 +608,7 @@ async function runNetworkSendTest(
     console.log(
       `[PROD TEST] Filling recipient address (Account 2) for second send on ${networkName}: ${senderAddress}`,
     );
-    await sendPage.fillRecipient(senderAddress);
+    await sendPage.fillRecipient({ recipientAddress: senderAddress });
 
     // Fill amount
     console.log(
@@ -675,6 +678,8 @@ async function runNetworkSendTest(
       undefined,
       'success',
     );
+
+    await driver.clickElement('[data-testid="bottom-nav-home"]');
 
     // ============================================
     // STEP 6: Switch to Account 2 and verify received balance
