@@ -304,6 +304,12 @@ async function runNetworkSendTest(
       `[PROD TEST] MetaMask automatically switched to ${networkName}`,
     );
 
+    await driver.clickElement('[data-testid="page-header-back-button"]');
+    await driver.delay(PROD_DELAYS.API_RESPONSE);
+    // await driver.clickElement('[data-testid="drawer-close-button"]');
+    // await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+
     // Wait for the home page to load with the new network
     await homePage.checkPageIsLoaded();
     await driver.delay(PROD_DELAYS.API_RESPONSE);
@@ -503,7 +509,7 @@ async function runNetworkSendTest(
     console.log(
       `[PROD TEST] Filling recipient address (Account 1) for ${networkName}: ${recipientAddress}`,
     );
-    await sendPage.fillRecipient(recipientAddress);
+    await sendPage.fillRecipient({ recipientAddress: recipientAddress });
 
     // Fill amount
     console.log(
@@ -553,6 +559,8 @@ async function runNetworkSendTest(
       undefined,
       'success',
     );
+
+    await driver.clickElement('[data-testid="bottom-nav-home"]');
     // ============================================
     // STEP 4: Switch to Account 1 and verify received balance
     // ============================================
@@ -627,7 +635,7 @@ async function runNetworkSendTest(
     console.log(
       `[PROD TEST] Checking activity tab for Account 1 on ${networkName}...`,
     );
-    await driver.clickElement('[data-testid="account-overview__activity-tab"]');
+    await driver.clickElement('[data-testid="bottom-nav-activity"]');
     await driver.delay(1000);
 
     console.log(
@@ -649,6 +657,8 @@ async function runNetworkSendTest(
       );
       // Do not throw - continue test execution
     }
+
+    await driver.clickElement('[data-testid="bottom-nav-home"]');
 
     // ============================================
     // STEP 5: Send from Account 1 to Account 2 (still on Account 1)
@@ -682,7 +692,7 @@ async function runNetworkSendTest(
     console.log(
       `[PROD TEST] Filling recipient address (Account 2) for second send on ${networkName}: ${senderAddress}`,
     );
-    await sendPage.fillRecipient(senderAddress);
+    await sendPage.fillRecipient({ recipientAddress: senderAddress });
 
     // Fill amount
     console.log(

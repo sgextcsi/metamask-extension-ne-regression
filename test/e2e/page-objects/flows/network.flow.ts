@@ -1,4 +1,5 @@
 import { Driver } from '../../webdriver/driver';
+import HomePage from '../pages/home/homepage';
 import TokensTab from '../pages/home/tokens-tab';
 import NetworkManager from '../pages/network-manager';
 
@@ -72,4 +73,18 @@ export async function waitForNetworkManagerBackdropToClear(
   driver: Driver,
 ): Promise<void> {
   await driver.assertElementNotPresent('.modal__backdrop');
+}
+
+/**
+ * Opens the global networks menu to display the SelectNetwork dialog.
+ * This allows adding or managing custom networks.
+ *
+ * @param driver - The webdriver instance.
+ */
+export async function switchToEditRPCViaGlobalMenuNetworks(
+  driver: Driver,
+): Promise<void> {
+  console.log('Opening global networks menu to manage custom networks');
+  const homePage = new HomePage(driver);
+  await homePage.headerNavbar.openGlobalNetworksMenu();
 }

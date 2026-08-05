@@ -280,6 +280,8 @@ class AddEditNetworkModal {
   async saveEditedNetwork(networkName?: string): Promise<void> {
     console.log('Save and close edit network modal');
     const saveButtonSelector = await this.getSaveButtonSelector();
+    await this.driver.clickElementAndWaitToDisappear(saveButtonSelector);
+  }
 
   /**
    * Selects an RPC from the dropdown in the edit network modal.

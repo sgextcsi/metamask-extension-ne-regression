@@ -22,6 +22,9 @@ class AddNetworkRpcUrlModal {
     tag: 'p',
   };
 
+  private readonly settingsV2AddRpcUrlButton =
+    '[data-testid="page-container-footer-next"]';
+
   constructor(driver: Driver) {
     this.driver = driver;
   }
