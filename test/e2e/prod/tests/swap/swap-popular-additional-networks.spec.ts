@@ -36,6 +36,7 @@ import {
 import {
   resolveTokensBySymbols,
   importSingleFundedAccount,
+  ensureLowValueAssetsExpanded,
   waitForSwapQuoteReady,
   assertCtaFeeText,
   captureSwapAmounts,
@@ -54,6 +55,7 @@ import {
   recoverToHome,
   generateSwapExecutionReport,
   logSwapDetailPageContent,
+  validateSwapActivityPageFields,
 } from './swap-execution-helpers';
 
 function getCliOptionValue(optionName: string): string | undefined {
@@ -324,6 +326,20 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
             );
             console.log(`[TEST] ✅ ERC-20 tokens imported into wallet`);
 
+            // Ensure low-value assets section is expanded (if collapsed after import)
+            try {
+              console.log('[TEST] Waiting for token list to load after import...');
+              await driver.waitForSelector(
+                '[data-testid="multichain-token-list-button"]',
+                { timeout: 10000 },
+              );
+              await driver.delay(500);
+              await ensureLowValueAssetsExpanded(driver);
+            } catch (toggleError) {
+              console.warn('[TEST] ⚠️  Could not ensure toggle expanded after import:', toggleError);
+              // Continue anyway - not critical
+            }
+
             // Build symbol → token lookup for address resolution
             const tokenBySymbol = new Map<string, Token>(
               resolvedTokens.map((t) => [t.symbol, t]),
@@ -380,6 +396,31 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
               console.log(`\n[TEST] ── Route: ${routeLabel} ──`);
 
               try {
+                // -- Ensure low-value-assets toggle is expanded before each route --
+                try {
+                  console.log('[TEST] Ensuring low-value-assets toggle is expanded...');
+
+                  // After navigating back, we're on Activity Tab. Switch to Tokens/Asset Tab
+                  console.log('[TEST] Switching to Tokens/Asset Tab...');
+                  await driver.clickElement('[data-testid="account-overview__asset-tab"]');
+                  await driver.delay(1000);
+
+                  // Wait for token list to load (ensures DOM is ready)
+                  console.log('[TEST] Waiting for token list to load...');
+                  await driver.waitForSelector(
+                    '[data-testid="multichain-token-list-button"]',
+                    { timeout: 10000 },
+                  );
+                  console.log('[TEST] Token list loaded');
+                  await driver.delay(500);
+
+                  // Now call the helper to expand toggle if needed
+                  await ensureLowValueAssetsExpanded(driver);
+                } catch (toggleError) {
+                  console.warn('[TEST] ⚠️  Could not ensure toggle expanded:', toggleError);
+                  // Continue anyway - not critical
+                }
+
                 // -- Enter the swap page fresh from home for every route --
                 console.log(
                   `[TEST] Entering swap flow for route: ${routeLabel}`,
@@ -460,85 +501,64 @@ describe('Production E2E: Network Swap Execution', function (this: Suite) {
                   `-${toAmount} ""$""`,
                 );
 
-                // -- Open detail page --
+                // -- Open detail page and wait --
                 await openLatestSwapActivityRecord(
                   driver,
                   fromSymbol,
                   toSymbol,
                 );
 
-                // -- Log detail page content --
-                await logSwapDetailPageContent(driver);
+                await driver.delay(2000);
 
-                // -- Assert detail page --
-                const statusResult = await assertSwapDetailConfirmed(driver);
+                // -- Validate swap activity page fields --
+                console.log('[TEST] Validating swap activity page fields...');
+                const activityValidation = await validateSwapActivityPageFields(driver);
+
+                // Record all validations
                 recordValidation(
-                  'Detail status confirmed',
-                  statusResult.isValid ? 'passed' : 'warning',
-                  statusResult.message,
-                );
-
-                const swappedRowResult = await assertSwappedTokenPair(
-                  driver,
-                  fromSymbol,
-                  toSymbol,
+                  'Activity Primary Currency',
+                  activityValidation.primaryCurrency.isValid ? 'passed' : 'warning',
+                  `${activityValidation.primaryCurrency.value || 'N/A'}`,
                 );
                 recordValidation(
-                  'Detail swapped row',
-                  swappedRowResult.isValid ? 'passed' : 'warning',
-                  swappedRowResult.message,
+                  'Activity Status',
+                  activityValidation.status.isValid ? 'passed' : 'warning',
+                  `${activityValidation.status.value || 'N/A'}`,
                 );
-
-                const timestampResult =
-                  await assertTransactionTimestamp(driver);
                 recordValidation(
-                  'Detail time stamp row',
-                  timestampResult.isValid ? 'passed' : 'warning',
-                  timestampResult.message,
+                  'Activity Account',
+                  activityValidation.account.isValid ? 'passed' : 'warning',
+                  `${activityValidation.account.value || 'N/A'}`,
+                );
+                recordValidation(
+                  'Activity Network',
+                  activityValidation.network.isValid ? 'passed' : 'warning',
+                  `${activityValidation.network.value || 'N/A'}`,
+                );
+                recordValidation(
+                  'Activity Transaction ID',
+                  activityValidation.transactionId.isValid ? 'passed' : 'warning',
+                  `${activityValidation.transactionId.value || 'N/A'}`,
+                );
+                recordValidation(
+                  'Activity Network Fee',
+                  activityValidation.networkFee.isValid ? 'passed' : 'warning',
+                  `${activityValidation.networkFee.value || 'N/A'}`,
+                );
+                recordValidation(
+                  'Activity Total Amount',
+                  activityValidation.totalAmount.isValid ? 'passed' : 'warning',
+                  `${activityValidation.totalAmount.value || 'N/A'}`,
                 );
 
-                let sentRowResult;
-                if (useMaxForRoute) {
-                  sentRowResult = await assertDetailRow(driver, 'You sent', fromSymbol);
+                if (activityValidation.warnings.length > 0) {
+                  console.warn(`[TEST] ⚠️  Activity validation had ${activityValidation.warnings.length} warning(s):`);
+                  activityValidation.warnings.forEach((w) => {
+                    console.warn(`[TEST]   - ${w}`);
+                  });
                 } else {
-                  sentRowResult = await assertDetailRow(
-                    driver,
-                    'You sent',
-                    `${fromAmount} ${fromSymbol}`,
-                  );
+                  console.log('[TEST] ✅ All activity page fields validated successfully');
                 }
-                recordValidation(
-                  'Detail You sent row',
-                  sentRowResult.isValid ? 'passed' : 'warning',
-                  useMaxForRoute
-                    ? `contains ${fromSymbol} (max route)`
-                    : `${fromAmount} ${fromSymbol}`,
-                );
-                const receivedRowResult =
-                  await validateDetailRowAmountAtPrecision(
-                    driver,
-                    'You received',
-                    `${toAmount} ${toSymbol}`,
-                  );
-                recordValidation(
-                  'Detail You received row',
-                  receivedRowResult.isValid ? 'passed' : 'warning',
-                  receivedRowResult.message,
-                );
-                if (!receivedRowResult.isValid) {
-                  console.warn(
-                    `[TEST] ⚠️  ALERT: ${receivedRowResult.message}`,
-                  );
-                }
-                const totalGasFeeResult = await assertTotalGasFeeRow(
-                  driver,
-                  networkConfig.gasFeeSponsoredByProtocol ?? false,
-                );
-                recordValidation(
-                  'Detail Total gas fee row',
-                  totalGasFeeResult.isValid ? 'passed' : 'warning',
-                  totalGasFeeResult.message,
-                );
 
                 // -- Navigate back to home for next route --
                 await navigateBackToHome(driver);

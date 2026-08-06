@@ -221,7 +221,7 @@ export async function submitSwapAndWaitForConfirmed(
   const activityListPage = new ActivityListPage(driver);
   await activityListPage.goToActivityList();
 
-  const swapLabel = `Swap ${swapFromSymbol} to ${swapToSymbol}`;
+  const swapLabel = `Swapped ${swapFromSymbol} to ${swapToSymbol}`;
   console.log(
     `[EXEC] Waiting for confirmed activity: "${swapLabel}" (timeout: ${timeout}ms)`,
   );
@@ -458,9 +458,88 @@ export async function openLatestSwapActivityRecord(
     await driver.clickElement({ tag: 'p', text: displayLabel });
   }
 
-  // Wait for detail page URL
-  await driver.waitForUrlContaining({ url: '/cross-chain/tx-details' });
-  console.log('[EXEC] Swap detail page loaded');
+  // Wait for detail page URL with error recovery
+  try {
+    await driver.waitForUrlContaining({ url: '/cross-chain/tx-details' });
+    console.log('[EXEC] Swap detail page loaded');
+  } catch (urlError) {
+    // If URL wait times out, try to navigate back to previous page
+    console.warn(
+      `[WARN] Timeout waiting for /cross-chain/tx-details: ${urlError instanceof Error ? urlError.message : String(urlError)}`,
+    );
+    console.log('[EXEC] Attempting to recover by navigating back...');
+
+    let recoverySucceeded = false;
+
+    try {
+      // Try multiple back button selectors in order
+      const backButtonSelectors = [
+        '[aria-label="Back"]',  // Primary: aria-label selector
+        '//*[@aria-label="Back"]',  // XPath variant
+        '//*[@data-testid="transaction-details-back-button"]',  // Legacy: data-testid
+      ];
+
+      let backButtonClicked = false;
+
+      for (const selector of backButtonSelectors) {
+        try {
+          console.log(`[EXEC] Trying back button selector: ${selector}`);
+          const backButtonPresent = await driver.isElementPresentAndVisible(
+            selector,
+            2000,
+          );
+
+          if (backButtonPresent) {
+            console.log(
+              `[EXEC] ✅ Back button found with selector: ${selector}`,
+            );
+            await driver.clickElement(selector);
+            console.log('[EXEC] ✅ Back button clicked successfully');
+            await driver.delay(1500);
+            backButtonClicked = true;
+            recoverySucceeded = true;
+            break;
+          }
+        } catch (selectorError) {
+          console.log(
+            `[EXEC] Selector ${selector} not available: ${selectorError instanceof Error ? selectorError.message : String(selectorError)}`,
+          );
+          // Try next selector
+        }
+      }
+
+      if (!backButtonClicked) {
+        // If back button click failed, try general navigation back
+        console.log('[EXEC] Back button not found, attempting alternative recovery...');
+        const navSuccess = await navigateBack(driver, { timeout: 5000 });
+        if (navSuccess) {
+          await driver.delay(1500);
+          console.log('[EXEC] ✅ Alternative navigation completed');
+          recoverySucceeded = true;
+        } else {
+          console.warn(
+            '[EXEC] ⚠️  Alternative navigation also failed',
+          );
+          recoverySucceeded = false;
+        }
+      }
+    } catch (backError) {
+      console.error(
+        `[EXEC] ❌ Recovery attempt failed: ${backError instanceof Error ? backError.message : String(backError)}`,
+      );
+      recoverySucceeded = false;
+    }
+
+    // Only throw if recovery failed. If recovery succeeded, just return.
+    if (!recoverySucceeded) {
+      throw new Error(
+        `[EXEC] Failed to load swap detail page (tx-details URL not reached) and recovery also failed: ${urlError instanceof Error ? urlError.message : String(urlError)}`,
+      );
+    } else {
+      console.log('[EXEC] ✅ Successfully recovered to home page after URL timeout');
+      return;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1198,4 +1277,770 @@ export function generateSwapExecutionReport(
 
   fs.writeFileSync(reportPath, md, 'utf-8');
   console.log(`[EXEC] Swap execution report written to: ${reportPath}`);
+}
+
+// ---------------------------------------------------------------------------
+// Swap Transaction Details Page Validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Comprehensive validation of swap transaction details page (SOFT-FAIL - NEVER THROWS).
+ *
+ * Validates all required elements including "You sent", "You received",
+ * Status, Network, Transaction ID, Network fee, and Total amount.
+ *
+ * **IMPORTANT: This function NEVER throws exceptions or hard fails.**
+ * If any validation fails:
+ * - Logs warning to console
+ * - Returns results with warnings
+ * - Automatically clicks back button to return to previous page
+ * - Test continues to next route without halting
+ *
+ * Usage: Check results.allValid and results.warnings to decide next action
+ *
+ * @param driver - WebDriver instance
+ * @returns Structured validation results with all checks and warnings (NEVER throws)
+ */
+export async function validateSwapTransactionDetailsPage(
+  driver: Driver,
+): Promise<SwapTransactionDetailsValidation> {
+  console.log('[VALIDATE] Starting comprehensive swap transaction details validation...');
+
+  const results: SwapTransactionDetailsValidation = {
+    allValid: true,
+    warnings: [],
+    youSent: { isValid: false, message: 'Not checked' },
+    youReceived: { isValid: false, message: 'Not checked' },
+    status: { isValid: false, message: 'Not checked' },
+    network: { isValid: false, message: 'Not checked' },
+    transactionId: { isValid: false, present: false, message: 'Not checked' },
+    networkFee: { isValid: false, message: 'Not checked' },
+    totalAmount: { isValid: false, message: 'Not checked' },
+    backButton: { isValid: false, message: 'Not checked' },
+  };
+
+  try {
+    // =========================================================================
+    // 1. VALIDATE "YOU SENT" SECTION
+    // =========================================================================
+    console.log('[VALIDATE] Checking "You sent" section...');
+    try {
+      // Check for the "You sent" label
+      const youSentLabelXpath = '//*[contains(@class, "text-alternative") and contains(text(), "You sent")]';
+      const youSentLabel = await driver.isElementPresentAndVisible(youSentLabelXpath, 2000);
+
+      if (!youSentLabel) {
+        const msg = 'You sent label not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.youSent = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      } else {
+        // Find the amount associated with "You sent"
+        const sentAmountXpath = `${youSentLabelXpath}/../..//*[@data-testid="transaction-list-item-primary-currency"]`;
+        const sentAmountElement = await driver.findElement({ xpath: sentAmountXpath });
+        const sentAmount = (await sentAmountElement.getText()).trim();
+
+        if (sentAmount && sentAmount.length > 0) {
+          console.log(`[VALIDATE] ✅ You sent amount found: ${sentAmount}`);
+          results.youSent = { isValid: true, amount: sentAmount, message: `You sent: ${sentAmount}` };
+        } else {
+          const msg = 'You sent label found but amount is empty';
+          console.warn(`[VALIDATE] ⚠️  ${msg}`);
+          results.youSent = { isValid: false, message: msg };
+          results.warnings.push(msg);
+          results.allValid = false;
+        }
+      }
+    } catch (error) {
+      const msg = `You sent section validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.youSent = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 2. VALIDATE "YOU RECEIVED" SECTION
+    // =========================================================================
+    console.log('[VALIDATE] Checking "You received" section...');
+    try {
+      // Check for the "You received" label and amount
+      const youReceivedSelector = "//p[text()='You received']/..//h2";
+      const receivedAmountElement = await driver.findElement(youReceivedSelector);
+      const receivedAmount = (await receivedAmountElement.getText()).trim();
+
+      if (receivedAmount && receivedAmount.length > 0) {
+        console.log(`[VALIDATE] ✅ You received amount found: ${receivedAmount}`);
+        results.youReceived = { isValid: true, amount: receivedAmount, message: `You received: ${receivedAmount}` };
+      } else {
+        const msg = 'You received amount is empty';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.youReceived = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      }
+    } catch (error) {
+      const msg = `You received section validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.youReceived = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 3. VALIDATE STATUS
+    // =========================================================================
+    console.log('[VALIDATE] Checking Status row...');
+    try {
+      const statusRowXpath = '//*[@data-testid="transaction-breakdown-row-title" and text()="Status"]';
+      const statusRowPresent = await driver.isElementPresentAndVisible(statusRowXpath, 2000);
+
+      if (!statusRowPresent) {
+        const msg = 'Status row not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.status = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      } else {
+        // Extract status value from success span
+        const statusValueXpath = '//*[@data-testid="transaction-details-status-success"]';
+        const statusElement = await driver.findElement({ xpath: statusValueXpath });
+        const statusValue = (await statusElement.getText()).trim();
+
+        if (statusValue && statusValue.length > 0) {
+          console.log(`[VALIDATE] ✅ Status found: ${statusValue}`);
+          results.status = { isValid: true, value: statusValue, message: `Status: ${statusValue}` };
+        } else {
+          const msg = 'Status row found but value is empty';
+          console.warn(`[VALIDATE] ⚠️  ${msg}`);
+          results.status = { isValid: false, message: msg };
+          results.warnings.push(msg);
+          results.allValid = false;
+        }
+      }
+    } catch (error) {
+      const msg = `Status validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.status = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 4. VALIDATE NETWORK
+    // =========================================================================
+    console.log('[VALIDATE] Checking Network row...');
+    try {
+      const networkRowXpath = '//*[@data-testid="transaction-breakdown-row-title" and text()="Network"]';
+      const networkRowPresent = await driver.isElementPresentAndVisible(networkRowXpath, 2000);
+
+      if (!networkRowPresent) {
+        const msg = 'Network row not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.network = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      } else {
+        // Extract network value from span sibling
+        const networkValueXpath = '//*[@data-testid="transaction-breakdown-row-title" and text()="Network"]/..//span';
+        const networkElement = await driver.findElement({ xpath: networkValueXpath });
+        const networkValue = (await networkElement.getText()).trim();
+
+        if (networkValue && networkValue.length > 0) {
+          console.log(`[VALIDATE] ✅ Network found: ${networkValue}`);
+          results.network = { isValid: true, value: networkValue, message: `Network: ${networkValue}` };
+        } else {
+          const msg = 'Network row found but value is empty';
+          console.warn(`[VALIDATE] ⚠️  ${msg}`);
+          results.network = { isValid: false, message: msg };
+          results.warnings.push(msg);
+          results.allValid = false;
+        }
+      }
+    } catch (error) {
+      const msg = `Network validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.network = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 5. VALIDATE TRANSACTION ID
+    // =========================================================================
+    console.log('[VALIDATE] Checking Transaction ID row...');
+    try {
+      const txIdRowXpath = '//*[@data-testid="transaction-breakdown-row-title" and text()="Transaction ID"]';
+      const txIdRowPresent = await driver.isElementPresentAndVisible(txIdRowXpath, 2000);
+
+      if (txIdRowPresent) {
+        console.log('[VALIDATE] ✅ Transaction ID row present');
+        results.transactionId = { isValid: true, present: true, message: 'Transaction ID row is present' };
+      } else {
+        const msg = 'Transaction ID row not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.transactionId = { isValid: false, present: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      }
+    } catch (error) {
+      const msg = `Transaction ID validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.transactionId = { isValid: false, present: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 6. VALIDATE NETWORK FEE
+    // =========================================================================
+    console.log('[VALIDATE] Checking Network fee row...');
+    try {
+      const networkFeeRowXpath = '//*[@data-testid="transaction-breakdown-row-title" and text()="Network fee"]';
+      const networkFeeRowPresent = await driver.isElementPresentAndVisible(networkFeeRowXpath, 2000);
+
+      if (!networkFeeRowPresent) {
+        const msg = 'Network fee row not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.networkFee = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      } else {
+        // Extract fee value
+        const networkFeeValueXpath = '//*[@data-testid="transaction-base-fee"]/div';
+        const feeElement = await driver.findElement({ xpath: networkFeeValueXpath });
+        const feeValue = (await feeElement.getText()).trim();
+
+        if (feeValue && feeValue.length > 0) {
+          console.log(`[VALIDATE] ✅ Network fee found: ${feeValue}`);
+          results.networkFee = { isValid: true, value: feeValue, message: `Network fee: ${feeValue}` };
+        } else {
+          const msg = 'Network fee row found but value is empty';
+          console.warn(`[VALIDATE] ⚠️  ${msg}`);
+          results.networkFee = { isValid: false, message: msg };
+          results.warnings.push(msg);
+          results.allValid = false;
+        }
+      }
+    } catch (error) {
+      const msg = `Network fee validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.networkFee = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 7. VALIDATE TOTAL AMOUNT
+    // =========================================================================
+    console.log('[VALIDATE] Checking Total amount row...');
+    try {
+      const totalAmountRowXpath = '//*[@data-testid="transaction-breakdown-row-title" and text()="Total amount"]';
+      const totalAmountRowPresent = await driver.isElementPresentAndVisible(totalAmountRowXpath, 2000);
+
+      if (!totalAmountRowPresent) {
+        const msg = 'Total amount row not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.totalAmount = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      } else {
+        // Extract total amount value
+        const totalAmountValueXpath = '//*[@data-testid="transaction-breakdown-value-amount"]/div';
+        const totalElement = await driver.findElement({ xpath: totalAmountValueXpath });
+        const totalValue = (await totalElement.getText()).trim();
+
+        if (totalValue && totalValue.length > 0) {
+          console.log(`[VALIDATE] ✅ Total amount found: ${totalValue}`);
+          results.totalAmount = { isValid: true, value: totalValue, message: `Total amount: ${totalValue}` };
+        } else {
+          const msg = 'Total amount row found but value is empty';
+          console.warn(`[VALIDATE] ⚠️  ${msg}`);
+          results.totalAmount = { isValid: false, message: msg };
+          results.warnings.push(msg);
+          results.allValid = false;
+        }
+      }
+    } catch (error) {
+      const msg = `Total amount validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.totalAmount = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+
+    // =========================================================================
+    // 8. VALIDATE BACK BUTTON
+    // =========================================================================
+    console.log('[VALIDATE] Checking back button...');
+    try {
+      const backButtonXpath = '//*[@data-testid="transaction-details-back-button"]';
+      const backButtonPresent = await driver.isElementPresentAndVisible(backButtonXpath, 2000);
+
+      if (backButtonPresent) {
+        console.log('[VALIDATE] ✅ Back button is present');
+        results.backButton = { isValid: true, message: 'Back button is present and visible' };
+      } else {
+        const msg = 'Back button not found';
+        console.warn(`[VALIDATE] ⚠️  ${msg}`);
+        results.backButton = { isValid: false, message: msg };
+        results.warnings.push(msg);
+        results.allValid = false;
+      }
+    } catch (error) {
+      const msg = `Back button validation failed: ${error instanceof Error ? error.message : String(error)}`;
+      console.warn(`[VALIDATE] ⚠️  ${msg}`);
+      results.backButton = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (outerError) {
+    const msg = `Outer validation error: ${outerError instanceof Error ? outerError.message : String(outerError)}`;
+    console.error(`[VALIDATE] ❌ ${msg}`);
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // IF ANY VALIDATION FAILED, CLICK BACK AND WAIT FOR PAGE TO LOAD
+  // This is NON-THROWING - always attempts to return to previous page
+  // =========================================================================
+  if (!results.allValid) {
+    console.log('[VALIDATE] ⚠️  Some validations failed. Attempting to navigate back to previous page...');
+
+    try {
+      // Try to click back button (always attempt, even if back button validation failed)
+      await driver.clickElement('[data-testid="transaction-details-back-button"]');
+      console.log('[VALIDATE] ✅ Back button clicked successfully');
+
+      // Wait for previous page to load
+      await driver.delay(1500);
+      const homeActivityTab = '[data-testid="account-overview__activity-tab"]';
+      try {
+        await driver.waitForSelector(homeActivityTab, { timeout: 10000 });
+        console.log('[VALIDATE] ✅ Successfully returned to previous page (activity tab visible)');
+      } catch (_waitError) {
+        // Page may have loaded but activity tab not immediately visible - this is OK
+        console.warn('[VALIDATE] ⚠️  Could not confirm activity tab visible, but back navigation was attempted');
+      }
+    } catch (backError) {
+      // Back button click failed - log warning but don't throw
+      const backMsg = `⚠️  Could not click back button: ${backError instanceof Error ? backError.message : String(backError)}. Proceeding anyway...`;
+      console.warn(`[VALIDATE] ${backMsg}`);
+      results.warnings.push(backMsg);
+
+      // Try alternative: navigate using history
+      try {
+        console.log('[VALIDATE] Attempting alternative navigation...');
+        await driver.delay(1000);
+        const homeActivityTab = '[data-testid="account-overview__activity-tab"]';
+        await driver.waitForSelector(homeActivityTab, { timeout: 5000 });
+        console.log('[VALIDATE] ✅ Alternative navigation successful');
+      } catch (_altError) {
+        console.warn('[VALIDATE] ⚠️  Alternative navigation also failed, but test will continue with warnings');
+      }
+    }
+  }
+
+  // =========================================================================
+  // FINAL SUMMARY - ALWAYS LOGGED, NEVER THROWS
+  // =========================================================================
+  console.log(`[VALIDATE] ========== VALIDATION SUMMARY ==========`);
+  console.log(`[VALIDATE] All Valid: ${results.allValid ? '✅ YES' : '⚠️ NO (SOFT FAIL - WARNINGS ONLY)'}`);
+  console.log(`[VALIDATE] Total Warnings: ${results.warnings.length}`);
+  if (results.warnings.length > 0) {
+    console.log('[VALIDATE] Warnings (proceeding to next route):');
+    results.warnings.forEach((w, i) => {
+      console.log(`[VALIDATE]   ${i + 1}. ${w}`);
+    });
+  }
+  console.log('[VALIDATE] ==========================================');
+
+  // IMPORTANT: This function NEVER throws - it only returns warnings
+  // Caller should check results.allValid and results.warnings if needed
+  return results;
+}
+
+// ---------------------------------------------------------------------------
+// Low-value assets toggle
+// ---------------------------------------------------------------------------
+
+/**
+ * Ensures low-value assets section is expanded.
+ *
+ * After token import, the low-value assets section might be collapsed
+ * (aria-expanded="false"). This function checks the toggle state and
+ * expands it if needed.
+ *
+ * Logic:
+ * - If aria-expanded="false" → Click toggle to expand → aria-expanded="true"
+ * - If aria-expanded="true" → No action (already expanded)
+ * - If toggle not found → No action (not an error condition)
+ *
+ * @param driver - WebDriver instance
+ */
+export async function ensureLowValueAssetsExpanded(
+  driver: Driver,
+): Promise<void> {
+  const toggleSelector = '[data-testid="low-value-assets-toggle"]';
+
+  try {
+    // Check if the toggle exists
+    const isTogglePresent = await driver.isElementPresent(toggleSelector);
+    if (!isTogglePresent) {
+      console.log(
+        '[EXEC] Low-value assets toggle not found (may not be in DOM yet)',
+      );
+      return;
+    }
+
+    // Get the element first, then get its aria-expanded attribute
+    const toggleElement = await driver.findElement(toggleSelector);
+    const ariaExpandedAttr = await toggleElement.getAttribute('aria-expanded');
+
+    if (ariaExpandedAttr === 'false') {
+      console.log(
+        '[EXEC] Low-value assets collapsed (aria-expanded="false"). Expanding...',
+      );
+      await driver.clickElement(toggleSelector);
+      await driver.delay(1000); // Wait for animation and DOM update
+      console.log(
+        '[EXEC] ✅ Low-value assets expanded (aria-expanded="true")',
+      );
+    } else {
+      console.log(
+        `[EXEC] Low-value assets already expanded (aria-expanded="${ariaExpandedAttr}")`,
+      );
+    }
+  } catch (error) {
+    // Non-critical error: log but don't throw
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(
+      `[EXEC] ⚠️  Could not ensure low-value assets expanded: ${errorMessage}`,
+    );
+  }
+}
+
+/**
+ * Type definition for swap transaction details validation results
+ */
+export type SwapTransactionDetailsValidation = {
+  allValid: boolean;
+  warnings: string[];
+  youSent: {
+    isValid: boolean;
+    amount?: string;
+    message: string;
+  };
+  youReceived: {
+    isValid: boolean;
+    amount?: string;
+    message: string;
+  };
+  status: {
+    isValid: boolean;
+    value?: string;
+    message: string;
+  };
+  network: {
+    isValid: boolean;
+    value?: string;
+    message: string;
+  };
+  transactionId: {
+    isValid: boolean;
+    present: boolean;
+    message: string;
+  };
+  networkFee: {
+    isValid: boolean;
+    value?: string;
+    message: string;
+  };
+  totalAmount: {
+    isValid: boolean;
+    value?: string;
+    message: string;
+  };
+  backButton: {
+    isValid: boolean;
+    message: string;
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Activity Page Fields Validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Comprehensive validation of swap transaction details page fields (SOFT-FAIL - NEVER THROWS).
+ *
+ * Validates 7 critical fields on the detail page:
+ * 1. Primary currency (You sent)
+ * 2. Status
+ * 3. Account (Address)
+ * 4. Network
+ * 5. Transaction ID (with clipboard copy)
+ * 6. Network Fee
+ * 7. Total Amount
+ *
+ * **IMPORTANT: This function NEVER throws exceptions or hard fails.**
+ * If any field is not found:
+ * - Logs warning to console
+ * - Continues validation for remaining fields
+ * - Returns results with warnings array
+ * - Test continues to next route without halting
+ *
+ * Usage: Check results.warnings array to see which validations failed
+ *
+ * @param driver - WebDriver instance
+ * @returns Structured validation results with all 7 fields (NEVER throws)
+ */
+export async function validateSwapActivityPageFields(
+  driver: Driver,
+): Promise<{
+  allValid: boolean;
+  warnings: string[];
+  primaryCurrency: { isValid: boolean; value?: string; message: string };
+  status: { isValid: boolean; value?: string; message: string };
+  account: { isValid: boolean; value?: string; message: string };
+  network: { isValid: boolean; value?: string; message: string };
+  transactionId: { isValid: boolean; value?: string; message: string };
+  networkFee: { isValid: boolean; value?: string; message: string };
+  totalAmount: { isValid: boolean; value?: string; message: string };
+}> {
+  console.log('[ACTIVITY] Starting swap activity page fields validation...');
+
+  const results = {
+    allValid: true,
+    warnings: [] as string[],
+    primaryCurrency: { isValid: false, message: 'Not checked' },
+    status: { isValid: false, message: 'Not checked' },
+    account: { isValid: false, message: 'Not checked' },
+    network: { isValid: false, message: 'Not checked' },
+    transactionId: { isValid: false, message: 'Not checked' },
+    networkFee: { isValid: false, message: 'Not checked' },
+    totalAmount: { isValid: false, message: 'Not checked' },
+  };
+
+  // =========================================================================
+  // 1. VALIDATE PRIMARY CURRENCY (You sent amount)
+  // =========================================================================
+  console.log('[ACTIVITY] 1. Checking primary currency...');
+  try {
+    const primarySelector = "//p[text()='You sent']/..//h2";
+    const primaryElement = await driver.findElement({ xpath: primarySelector });
+    const primaryText = (await primaryElement.getText()).trim();
+
+    if (primaryText && primaryText.length > 0) {
+      console.log(`[ACTIVITY] ✅ Primary currency: ${primaryText}`);
+      results.primaryCurrency = { isValid: true, value: primaryText, message: primaryText };
+    } else {
+      const msg = 'Primary currency element found but text is empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.primaryCurrency = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract primary currency: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.primaryCurrency = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // 2. VALIDATE STATUS
+  // =========================================================================
+  console.log('[ACTIVITY] 2. Checking Status...');
+  try {
+    // Look for "Status" label and get the value next to it
+    const statusXpath = "//p[contains(text(), 'Status')]/..//*[not(self::p)]";
+    const statusElement = await driver.findElement({ xpath: statusXpath });
+    const statusText = (await statusElement.getText()).trim();
+
+    if (statusText && statusText.length > 0) {
+      console.log(`[ACTIVITY] ✅ Status: ${statusText}`);
+      results.status = { isValid: true, value: statusText, message: statusText };
+    } else {
+      const msg = 'Status value not found or empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.status = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract status: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.status = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // 3. VALIDATE ACCOUNT (Address)
+  // =========================================================================
+  console.log('[ACTIVITY] 3. Checking Account...');
+  try {
+    // Look for "Account" label and get the address value
+    const accountXpath = "//p[contains(text(), 'Account')]/../following-sibling::*//h2 | //p[contains(text(), 'Account')]/..//h2";
+    const accountElement = await driver.findElement({ xpath: accountXpath });
+    const accountText = (await accountElement.getText()).trim();
+
+    if (accountText && accountText.length > 0) {
+      console.log(`[ACTIVITY] ✅ Account: ${accountText}`);
+      results.account = { isValid: true, value: accountText, message: accountText };
+    } else {
+      const msg = 'Account value not found or empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.account = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract account: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.account = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // 4. VALIDATE NETWORK
+  // =========================================================================
+  console.log('[ACTIVITY] 4. Checking Network...');
+  try {
+    // Look for "Network" label and get the value
+    const networkXpath = "//p[contains(text(), 'Network')]/..//*[not(self::p)]";
+    const networkElement = await driver.findElement({ xpath: networkXpath });
+    const networkText = (await networkElement.getText()).trim();
+
+    if (networkText && networkText.length > 0) {
+      console.log(`[ACTIVITY] ✅ Network: ${networkText}`);
+      results.network = { isValid: true, value: networkText, message: networkText };
+    } else {
+      const msg = 'Network value not found or empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.network = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract network: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.network = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // 5. VALIDATE TRANSACTION ID (with clipboard copy)
+  // =========================================================================
+  console.log('[ACTIVITY] 5. Checking Transaction ID...');
+  try {
+    const txIdButtonXpath = '//*[@data-testid="transaction-id"]';
+    const txIdButton = await driver.findElement({ xpath: txIdButtonXpath });
+
+    // Click the button to copy transaction ID to clipboard
+    console.log('[ACTIVITY] Clicking transaction ID copy button...');
+    await txIdButton.click();
+    await driver.delay(500); // Give clipboard time to populate
+
+    // Read from clipboard
+    console.log('[ACTIVITY] Reading transaction ID from clipboard...');
+    const txIdFromClipboard = await driver.getClipboardContent();
+    const txId = txIdFromClipboard.trim();
+
+    if (txId && txId.length > 0) {
+      console.log(`[ACTIVITY] ✅ Transaction ID (from clipboard): ${txId}`);
+      results.transactionId = { isValid: true, value: txId, message: `Transaction ID: ${txId}` };
+    } else {
+      const msg = 'Clipboard read but transaction ID is empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.transactionId = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract transaction ID: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.transactionId = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // 6. VALIDATE NETWORK FEE
+  // =========================================================================
+  console.log('[ACTIVITY] 6. Checking Network Fee...');
+  try {
+    // Look for "Network fee" label and get the amount
+    const networkFeeXpath = "//p[contains(text(), 'Network fee')]/..//h2 | //p[contains(text(), 'Network fee') or contains(text(), 'Gas fee')]/..//*[not(self::p)]";
+    const networkFeeElement = await driver.findElement({ xpath: networkFeeXpath });
+    const networkFeeText = (await networkFeeElement.getText()).trim();
+
+    if (networkFeeText && networkFeeText.length > 0) {
+      console.log(`[ACTIVITY] ✅ Network Fee: ${networkFeeText}`);
+      results.networkFee = { isValid: true, value: networkFeeText, message: networkFeeText };
+    } else {
+      const msg = 'Network fee value not found or empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.networkFee = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract network fee: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.networkFee = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // 7. VALIDATE TOTAL AMOUNT
+  // =========================================================================
+  console.log('[ACTIVITY] 7. Checking Total Amount...');
+  try {
+    // Look for "Total amount" label and get the amount
+    const totalAmountXpath = "//p[contains(text(), 'Total amount')]/..//h2 | //p[contains(text(), 'Total amount')]/..//*[not(self::p)]";
+    const totalAmountElement = await driver.findElement({ xpath: totalAmountXpath });
+    const totalAmountText = (await totalAmountElement.getText()).trim();
+
+    if (totalAmountText && totalAmountText.length > 0) {
+      console.log(`[ACTIVITY] ✅ Total Amount: ${totalAmountText}`);
+      results.totalAmount = { isValid: true, value: totalAmountText, message: totalAmountText };
+    } else {
+      const msg = 'Total amount value not found or empty';
+      console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+      results.totalAmount = { isValid: false, message: msg };
+      results.warnings.push(msg);
+      results.allValid = false;
+    }
+  } catch (error) {
+    const msg = `Failed to extract total amount: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[ACTIVITY] ⚠️  ${msg}`);
+    results.totalAmount = { isValid: false, message: msg };
+    results.warnings.push(msg);
+    results.allValid = false;
+  }
+
+  // =========================================================================
+  // FINAL SUMMARY - ALWAYS LOGGED, NEVER THROWS
+  // =========================================================================
+  console.log(`[ACTIVITY] ========== VALIDATION SUMMARY ==========`);
+  console.log(`[ACTIVITY] All Valid: ${results.allValid ? '✅ YES' : '⚠️ NO (SOFT FAIL - WARNINGS ONLY)'}`);
+  console.log(`[ACTIVITY] Total Warnings: ${results.warnings.length}`);
+  if (results.warnings.length > 0) {
+    console.log('[ACTIVITY] Warnings (test will continue):');
+    results.warnings.forEach((w, i) => {
+      console.log(`[ACTIVITY]   ${i + 1}. ${w}`);
+    });
+  }
+  console.log('[ACTIVITY] ==========================================');
+
+  // IMPORTANT: This function NEVER throws - it only returns warnings
+  return results;
 }

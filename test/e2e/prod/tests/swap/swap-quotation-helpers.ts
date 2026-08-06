@@ -406,6 +406,28 @@ export async function performSwapFlow(
 
   await driver.clickElement('[data-testid="account-overview__asset-tab"]');
   await driver.delay(PROD_DELAYS.API_RESPONSE);
+
+  // Wait for asset list to stabilize before clicking token
+  await driver.delay(2000);
+
+  // Ensure low-value assets toggle is expanded so all tokens are visible
+  console.log('[HELPER] Ensuring low-value assets are expanded before token selection...');
+  try {
+    const toggleSelector = '[data-testid="low-value-assets-toggle"]';
+    const isTogglePresent = await driver.isElementPresent(toggleSelector);
+    if (isTogglePresent) {
+      const toggleElement = await driver.findElement(toggleSelector);
+      const ariaExpandedAttr = await toggleElement.getAttribute('aria-expanded');
+      if (ariaExpandedAttr === 'false') {
+        console.log('[HELPER] Expanding low-value assets toggle...');
+        await driver.clickElement(toggleSelector);
+        await driver.delay(1000);
+      }
+    }
+  } catch (toggleError) {
+    console.warn('[HELPER] ⚠️  Could not ensure low-value assets expanded:', toggleError);
+  }
+
   // Some tokens display their full name instead of the symbol in the asset
   // list (e.g. AZND shows "Asian Dollar"). Derive the label to use as a
   // fallback when sourceTokenName is provided and differs from the symbol.
@@ -419,9 +441,9 @@ export async function performSwapFlow(
     try {
       await assetListPage.clickOnAsset(sourceTokenLabel);
     } catch (_err2) {
+      // Fallback: Try to find token by symbol OR label
       await driver.clickElement({
-        css: '[data-testid="multichain-token-list-button"]',
-        text: sourceTokenLabel,
+        xpath: `//*[@data-testid="multichain-token-list-button"][contains(., '${sourceTokenSymbol}') or contains(., '${sourceTokenLabel}')]`,
       });
     }
   }

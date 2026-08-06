@@ -35,6 +35,7 @@ import {
   Token,
   NetworkTestResult,
   generateConsolidatedReport,
+  ensureLowValueAssetsExpanded,
 } from './token-import-helpers';
 
 function getCliOptionValue(optionName: string): string | undefined {
@@ -175,10 +176,13 @@ async function runTokenImportTest(
       await addRpcUrlModal.fillAddRpcNameInput(networkConfig.rpcName);
       await addRpcUrlModal.saveAddRpcUrl();
 
+
       // Save the network using page-object fallback selectors for legacy + Settings V2 flows.
       await addEditNetworkModal.checkPageIsLoaded();
       await addEditNetworkModal.saveEditedNetwork(networkConfig.networkName);
 
+      await driver.clickElement('[data-testid="page-header-back-button"]');
+      await driver.delay(PROD_DELAYS.API_RESPONSE);
       // Test
       // saveEditedNetwork() handles navigation back to home page automatically
       // Wait longer for the navigation and page state transitions
@@ -586,6 +590,9 @@ async function runTokenImportTest(
             );
             await driver.delay(3000); // Wait for price API response
 
+            // Ensure low-value assets are expanded to see all imported tokens
+            await ensureLowValueAssetsExpanded(driver);
+
             // Find all token list items
             const tokenListItems = await driver.findElements(
               '[data-testid="multichain-token-list-button"]',
@@ -784,6 +791,15 @@ async function runTokenImportTest(
           );
           console.log(`[PROD TEST]    Error: ${errorMessage}`);
         }
+      }
+
+      // Ensure low-value assets remain expanded after token import
+      try {
+        console.log('[PROD TEST] Ensuring low-value assets are expanded...');
+        await ensureLowValueAssetsExpanded(driver);
+      } catch (toggleError) {
+        console.warn('[PROD TEST] ⚠️  Could not ensure toggle expanded after import:', toggleError);
+        // Continue anyway - not critical
       }
 
       // Calculate logo statistics

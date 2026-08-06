@@ -8,6 +8,8 @@
  * - Result tracking types
  */
 
+import { Driver } from '../../../webdriver/driver';
+
 /**
  * Token interface matching standard tokenlist format
  */
@@ -1013,4 +1015,53 @@ export function generateTokenDetailsReport(
   const fullPath = path.resolve(outputPath);
   fs.writeFileSync(fullPath, markdown, 'utf8');
   console.log(`[REPORT] Token details verification report saved to: ${fullPath}`);
+}
+
+/**
+ * Ensures the low-value assets section is expanded.
+ * If the toggle exists and is collapsed, clicks it to expand.
+ * Non-critical errors are logged but not thrown.
+ *
+ * @param driver - WebDriver instance
+ */
+export async function ensureLowValueAssetsExpanded(
+  driver: Driver,
+): Promise<void> {
+  const toggleSelector = '[data-testid="low-value-assets-toggle"]';
+
+  try {
+    // Check if the toggle exists
+    const isTogglePresent = await driver.isElementPresent(toggleSelector);
+    if (!isTogglePresent) {
+      console.log(
+        '[EXEC] Low-value assets toggle not found (may not be in DOM yet)',
+      );
+      return;
+    }
+
+    // Get the element first, then get its aria-expanded attribute
+    const toggleElement = await driver.findElement(toggleSelector);
+    const ariaExpandedAttr = await toggleElement.getAttribute('aria-expanded');
+
+    if (ariaExpandedAttr === 'false') {
+      console.log(
+        '[EXEC] Low-value assets collapsed (aria-expanded="false"). Expanding...',
+      );
+      await driver.clickElement(toggleSelector);
+      await driver.delay(1000); // Wait for animation and DOM update
+      console.log(
+        '[EXEC] ✅ Low-value assets expanded (aria-expanded="true")',
+      );
+    } else {
+      console.log(
+        `[EXEC] Low-value assets already expanded (aria-expanded="${ariaExpandedAttr}")`,
+      );
+    }
+  } catch (error) {
+    // Non-critical error: log but don't throw
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(
+      `[EXEC] ⚠️  Could not ensure low-value assets expanded: ${errorMessage}`,
+    );
+  }
 }
