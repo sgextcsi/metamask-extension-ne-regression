@@ -485,6 +485,25 @@ class FixtureBuilder {
       },
     });
   }
+     withNetworkControllerOnMegaETHMainnet() {
+    return this.withNetworkController({
+      selectedNetworkClientId: 'megaeth',
+      networkConfigurations: {
+        megaeth: {
+          chainId: CHAIN_IDS.MEGAETH_MAINNET,
+          nickname: 'MegaETH Mainnet',
+          rpcUrl: 'https://megaeth.drpc.org',
+          ticker: 'MegaETH',
+          rpcPrefs: {
+            blockExplorerUrl: 'https://megaeth.blockscout.com',
+          },
+          id: 'megaeth',
+          type: 'rpc',
+          isCustom: true,
+        },
+      },
+    });
+  }
 
   withNftController(data) {
     merge(
