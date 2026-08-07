@@ -237,6 +237,36 @@ export const SWAP_TEST_NETWORKS: NetworkSwapConfig[] = [
     defaultSwapAmount: 20,
     gasFeeSponsoredByProtocol: true,
   },
+  {
+    networkId: 'Sei',
+    networkName: 'Sei',
+    chainId: 1329,
+    nativeTokenSymbol: 'SEI',
+    manualTokens: [
+      {
+        symbol: 'USDC',
+        name: 'USDC',
+        address: '0xe15fc38f6d8c56af07bbcbe3baf5708a2bf42392',
+        decimals: 6,
+      },
+      {
+        symbol: 'USDT',
+        name: 'USDT0',
+        address: '0x9151434b16b9763660705744891fa906f660ecc5',
+        decimals: 6,
+      },
+    ],
+    fixtureSetupMethod: 'withNetworkControllerOnSei',
+    blockExplorerUrl: 'https://explorer.sei.xyz',
+    swapExecutionTokenSymbols: ['USDC', 'USDT'],
+    swapExecutionRoutes: [
+      { from: 'SEI', to: 'USDC', amount: 10 },
+      { from: 'USDC', to: 'USDT', amount: 0.23 },
+      { from: 'USDT', to: 'SEI', useMax: true },
+    ],
+    defaultSwapAmount: 20,
+    gasFeeSponsoredByProtocol: true,
+  },
   // Add more networks here as needed.
   //  Popular network list
   {
@@ -269,41 +299,41 @@ export const SWAP_TEST_NETWORKS: NetworkSwapConfig[] = [
     ],
   },
   // Custom network list
-  // {
-  //   networkId: 'Chiliz',
-  //   networkName: 'Chiliz Chain',
-  //   chainId: 88888,
-  //   nativeTokenSymbol: 'CHZ',
-  //   rpcUrl: 'https://rpc.ankr.com/chiliz',
-  //   rpcName: 'Chiliz RPC',
-  //   tokenlistUrl:
-  //     'https://raw.githubusercontent.com/chiliz-chain/token-list/main/tokenlist.json',
-  //   manualTokens: [
-  //     {
-  //       symbol: 'USDC',
-  //       name: 'Bridged USDC (ChainPort)',
-  //       address: '0xa37936F56249965d407E39347528a1A91eB1cbef',
-  //       decimals: 6,
-  //     },
-  //     {
-  //       symbol: 'PEPPER',
-  //       name: 'PEPPER',
-  //       address: '0x60F397acBCfB8f4e3234C659A3E10867e6fA6b67',
-  //       decimals: 18,
-  //     },
-  //   ],
-  //   fixtureSetupMethod: 'withNetworkControllerOnMainnet',
-  //   blockExplorerUrl: 'https://explorer.chiliz.com',
-  //   swapExecutionTokenSymbols: ['USDC', 'PEPPER'],
-  //   swapExecutionRoutes: [
-  //     { from: 'CHZ', to: 'USDC', amount: 5 },
-  //     { from: 'USDC', to: 'PEPPER', amount: 0.55 },
-  //     { from: 'PEPPER', to: 'CHZ', useMax: true },
-  //   ],
-  //   defaultSwapAmount: 20,
-  //   gasFeeSponsoredByProtocol: true,
-  //   requiresManualSetup: true,
-  // },
+  {
+    networkId: 'Chiliz',
+    networkName: 'Chiliz Chain',
+    chainId: 88888,
+    nativeTokenSymbol: 'CHZ',
+    rpcUrl: 'https://rpc.ankr.com/chiliz',
+    rpcName: 'Chiliz RPC',
+    tokenlistUrl:
+      'https://raw.githubusercontent.com/chiliz-chain/token-list/main/tokenlist.json',
+    manualTokens: [
+      {
+        symbol: 'USDC',
+        name: 'Bridged USDC (ChainPort)',
+        address: '0xa37936F56249965d407E39347528a1A91eB1cbef',
+        decimals: 6,
+      },
+      {
+        symbol: 'PEPPER',
+        name: 'PEPPER',
+        address: '0x60F397acBCfB8f4e3234C659A3E10867e6fA6b67',
+        decimals: 18,
+      },
+    ],
+    fixtureSetupMethod: 'withNetworkControllerOnMainnet',
+    blockExplorerUrl: 'https://explorer.chiliz.com',
+    swapExecutionTokenSymbols: ['USDC', 'PEPPER'],
+    swapExecutionRoutes: [
+      { from: 'CHZ', to: 'USDC', amount: 5 },
+      { from: 'USDC', to: 'PEPPER', amount: 0.55 },
+      { from: 'PEPPER', to: 'CHZ', useMax: true },
+    ],
+    defaultSwapAmount: 20,
+    gasFeeSponsoredByProtocol: true,
+    requiresManualSetup: true,
+  },
 ];
 
 /**

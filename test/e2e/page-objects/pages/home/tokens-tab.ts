@@ -1052,6 +1052,37 @@ class TokensTab extends HomePage {
     await this.driver.waitForSelector(this.tokenImportedSuccessMessage);
   }
 
+    async importCustomTokenFromManageTokensUI(
+    chainId: string,
+    tokenAddress: string,
+  ): Promise<void> {
+    console.log(
+      `[TOKEN-MANAGEMENT] Importing custom token ${tokenAddress} on chain ${chainId}`,
+    );
+
+    try {
+      // Import TokenManagementPage locally to avoid circular dependencies
+      const TokenManagementPage = (
+        await import('./token-management.js')
+      ).default;
+      const tokenManagementPage = new TokenManagementPage(this.driver);
+
+      // Execute the complete flow with skipInitialClick=true since dropdown is already open
+      await tokenManagementPage.addCustomToken(tokenAddress, true);
+
+      // Return to home page
+      await tokenManagementPage.goBackToHome();
+
+      console.log(`[TOKEN-MANAGEMENT] ✅ Token imported successfully`);
+    } catch (error) {
+      console.error(
+        `[TOKEN-MANAGEMENT] ❌ Failed to import token: ${error}`,
+      );
+      throw error;
+    }
+  }
+
+
   async importTokenBySearch({
     tokenName,
     networkName,

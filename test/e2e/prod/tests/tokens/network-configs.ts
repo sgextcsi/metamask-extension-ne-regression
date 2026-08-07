@@ -499,7 +499,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     networkId: 'Chiliz',
     networkName: 'Chiliz Chain',
     chainId: 88888,
-    chainIdHex: '0x15f90',
+    chainIdHex: '0x15b38',
     symbol: 'CHZ',
     rpcUrl: 'https://chiliz.publicnode.com',
     rpcName: 'Chiliz RPC',

@@ -466,6 +466,26 @@ class FixtureBuilder {
     });
   }
 
+    withNetworkControllerOnRobinhood() {
+    return this.withNetworkController({
+      selectedNetworkClientId: 'Robinhood Chain',
+      networkConfigurations: {
+        robinhood: {
+          chainId: CHAIN_IDS.ROBINHOOD_CHAIN,
+          nickname: 'Robinhood',
+          rpcUrl: `https://rpc.mainnet.chain.robinhood.com/${getInfuraProjectId()}`,
+          ticker: 'ETH',
+          rpcPrefs: {
+            blockExplorerUrl: 'https://robinhoodchain.blockscout.com',
+          },
+          id: 'robinhood',
+          type: 'rpc',
+          isCustom: true,
+        },
+      },
+    });
+  }
+
   withNftController(data) {
     merge(
       this.fixture.data.NftController
