@@ -322,7 +322,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
      networkId: 'etherlink',
      networkName: 'Etherlink Mainnet',
      chainId: 42793,
-     chainIdHex: '0xa7f1',
+     chainIdHex: '0xa729',
      symbol: 'XTZ',
      rpcUrl: 'https://node.mainnet.etherlink.com',
      rpcName: 'Etherlink RPC',
@@ -351,17 +351,17 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     tokenlistUrl: 'https://tokens.rootstock.io/tokenlist.json',
     blockExplorerUrl: 'https://explorer.rsk.co',
   },
-  // {
-  //   networkId: 'Genesys',
-  //   networkName: 'Genesys Mainnet',
-  //   chainId: 16507,
-  //   chainIdHex: '0x4073',
-  //   symbol: 'GSYS',
-  //   rpcUrl: 'https://rpc.genesys.network',
-  //   rpcName: 'Genesys RPC',
-  //   tokenlistUrl: 'https://raw.githubusercontent.com/Gchainvalidators/dex-assets/main/tokenlist.json',
-  //   blockExplorerUrl: 'https://gchainexplorer.genesys.network',
-  // },
+  {
+    networkId: 'Genesys',
+    networkName: 'Genesys Mainnet',
+    chainId: 16507,
+    chainIdHex: '0x407b',
+    symbol: 'GSYS',
+    rpcUrl: 'https://rpc.genesys.network',
+    rpcName: 'Genesys RPC',
+    tokenlistUrl: 'https://raw.githubusercontent.com/Gchainvalidators/dex-assets/main/tokenlist.json',
+    blockExplorerUrl: 'https://gchainexplorer.genesys.network',
+  },
   {
     networkId: 'Matchain',
     networkName: 'Matchain',
@@ -377,7 +377,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     networkId: 'EDUchain',
     networkName: 'EDU Chain',
     chainId: 41923,
-    chainIdHex: '0xa3d3',
+    chainIdHex: '0xa3c3',
     symbol: 'EDU',
     rpcUrl: 'https://rpc.edu-chain.raas.gelato.cloud',
     rpcName: 'EDU Chain RPC',
@@ -399,7 +399,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     networkId: 'Berachain',
     networkName: 'Berachain',
     chainId: 80094,
-    chainIdHex: '0x13836',
+    chainIdHex: '0x138de',
     symbol: 'BERA',
     rpcUrl: 'https://rpc.berachain.com',
     rpcName: 'Berachain RPC',
@@ -410,7 +410,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     networkId: 'XRPLEVM',
     networkName: 'XRPL EVM',
     chainId: 1440000,
-    chainIdHex: '0x160000',
+    chainIdHex: '0x15f900',
     symbol: 'XRP',
     rpcUrl: 'https://rpc.xrplevm.org',
     rpcName: 'XRPL EVM RPC',
@@ -454,9 +454,9 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     networkId: 'Plasma',
     networkName: 'Plasma Network',
     chainId: 9745,
-    chainIdHex: '0x2601',
+    chainIdHex: '0x2611',
     symbol: 'XPL',
-    rpcUrl: 'https://plasma.drpc.org',
+    rpcUrl: 'https://lb.routeme.sh/rpc/evm/9745',
     rpcName: 'Plasma Network RPC',
     tokenlistUrl:
       'https://raw.githubusercontent.com/PlasmaLaboratories/plasma-tokenlist/main/plasma.tokenlist.json',
@@ -466,7 +466,7 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
     networkId: 'Hemi',
     networkName: 'Hemi Network',
     chainId: 43111,
-    chainIdHex: '0xa8c7',
+    chainIdHex: '0xa867',
     symbol: 'ETH',
     rpcUrl: 'https://rpc.hemi.network/rpc',
     rpcName: 'Hemi Network RPC',
@@ -519,18 +519,18 @@ export const NETWORK_CONFIGS: NetworkConfig[] = [
       'https://raw.githubusercontent.com/tempoxyz/tempo-apps/refs/heads/main/apps/tokenlist/data/4217/tokenlist.json',
     blockExplorerUrl: 'https://explore.mainnet.tempo.xyz',
   },
-  {
-    networkId: 'Tempo Testnet',
-    networkName: 'Tempo Testnet Moderato',
-    chainId: 42429,
-    chainIdHex: '0xa5f5',
-    symbol: 'USD',
-    rpcUrl: 'https://rpc.testnet.tempo.xyz',
-    rpcName: 'Tempo Testnet RPC',
-    tokenlistUrl:
-      'https://raw.githubusercontent.com/tempoxyz/tempo-apps/main/apps/tokenlist/data/42429/tokenlist.json',
-    blockExplorerUrl: 'https://explorer.tempo.xyz',
-  },
+  // {
+  //   networkId: 'Tempo Testnet',
+  //   networkName: 'Tempo Testnet Moderato',
+  //   chainId: 42431,
+  //   chainIdHex: '0xa5bf',
+  //   symbol: 'USD',
+  //   rpcUrl: 'https://rpc.testnet.tempo.xyz',
+  //   rpcName: 'Tempo Testnet RPC',
+  //   tokenlistUrl:
+  //     'https://raw.githubusercontent.com/tempoxyz/tempo-apps/main/apps/tokenlist/data/42429/tokenlist.json',
+  //   blockExplorerUrl: 'https://explorer.tempo.xyz',
+  // },
   {
     networkId: 'Stable',
     networkName: 'Stable',
@@ -681,35 +681,23 @@ export const NETWORK_CONFIGS_ADDITIONAL: NetworkConfigAdditional[] = [
     tokenlistUrl: 'https://raw.githubusercontent.com/monad-crypto/token-list/refs/heads/main/tokenlist-mainnet.json',
     fixtureSetupMethod: 'withNetworkControllerOnArbitrum',
   },
-  // {
-  //   networkId: 'HYPE',
-  //   networkName: 'HyperEVM',
-  //   chainId: 999,
-  //   tokenlistUrl: `file://${__dirname}/tokenlist.json`,
-  //   fixtureSetupMethod: 'withNetworkControllerOnHyperEVM',
-  // },
-  // {
-  //   networkId: 'megaeth',
-  //   networkName: 'MegaETH',
-  //   chainId: 4326,
-  //   symbol: 'MEGA', // adjust if the native symbol differs
-  //   rpcUrl: 'https://rpc.megaeth.io', // placeholder, replace with real RPC
-  //   rpcName: 'MegaETH RPC',
-  //   tokenlistUrl:
-  //     'https://raw.githubusercontent.com/megaeth-labs/mega-tokenlist/main/megaeth.tokenlist.json',
-  //   blockExplorerUrl: 'https://explorer.megaeth.io', // optional
-  // },
-  // {
-  //   networkId: 'Base',
-  //   networkName: 'Base',
-  //   chainId: 4326,
-  //   symbol: 'ETH', // adjust if the native symbol differs
-  //   rpcUrl: 'https://rpc.megaeth.io', // placeholder, replace with real RPC
-  //   rpcName: 'MegaETH RPC',
-  //   tokenlistUrl:
-  //     'https://raw.githubusercontent.com/megaeth-labs/mega-tokenlist/main/megaeth.tokenlist.json',
-  //   blockExplorerUrl: 'https://explorer.megaeth.io', // optional
-  // },
+  {
+    networkId: 'HYPE',
+    networkName: 'HyperEVM',
+    chainId: 999,
+    chainIdHex: '0x3e7',
+    tokenlistUrl: `file://${__dirname}/tokenlist.json`,
+    fixtureSetupMethod: 'withNetworkControllerOnHyperEVM',
+  },
+  {
+    networkId: 'megaeth',
+    networkName: 'MegaETH',
+    chainId: 4326,
+    chainIdHex: '0x10e6',
+    tokenlistUrl:
+      'https://raw.githubusercontent.com/megaeth-labs/mega-tokenlist/main/megaeth.tokenlist.json',
+    fixtureSetupMethod: 'withNetworkControllerOnMegaETHMainnet', // optional
+  },
 ];
 
 /**

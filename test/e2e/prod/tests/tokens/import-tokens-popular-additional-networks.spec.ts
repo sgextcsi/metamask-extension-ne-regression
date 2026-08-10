@@ -39,6 +39,7 @@ import {
   Token,
   NetworkTestResult,
   generateConsolidatedReport,
+  ensureLowValueAssetsExpanded,
 } from './token-import-helpers';
 
 function getCliOptionValue(optionName: string): string | undefined {
@@ -536,6 +537,9 @@ async function runTokenImportTest(
               '[data-testid="account-overview__asset-tab"]',
             );
             await driver.delay(3000); // Wait for price API response
+
+            // Ensure low-value assets are expanded to see all imported tokens
+            await ensureLowValueAssetsExpanded(driver);
 
             // Find all token list items
             const tokenListItems = await driver.findElements(
