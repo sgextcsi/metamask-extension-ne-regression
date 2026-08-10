@@ -90,6 +90,8 @@ class HomePage {
 
   public headerNavbar: HeaderNavbar;
 
+  private readonly loadingLogo = '.loading-logo';
+
   private readonly loadingOverlay = {
     text: 'Connecting to Localhost 8545',
   };
@@ -522,6 +524,14 @@ class HomePage {
   }
 
   /**
+   * Ensures the home page is rendered and idle (loaded + loading overlay gone).
+   */
+  async ensurePageIsReady(): Promise<void> {
+    await this.checkPageIsLoaded();
+    await this.waitForLoadingOverlayToDisappear();
+  }
+
+  /**
    * Clicks the copy address button.
    */
   async getAccountAddress(): Promise<string> {
@@ -578,6 +588,13 @@ class HomePage {
 
   async togglePrivacyBalance(): Promise<void> {
     await this.driver.clickElement(this.privacyBalanceToggle);
+  }
+
+  async waitForLoadingLogoToDisappear(): Promise<void> {
+    console.log('Wait for loading logo to disappear');
+    await this.driver.assertElementNotPresent(this.loadingLogo, {
+      timeout: 10000,
+    });
   }
 
   async waitForLoadingOverlayToDisappear(): Promise<void> {
