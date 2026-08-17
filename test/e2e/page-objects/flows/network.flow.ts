@@ -1,7 +1,8 @@
+import { toEvmCaipChainId } from '@metamask/multichain-network-controller';
 import { Driver } from '../../webdriver/driver';
-import HomePage from '../pages/home/homepage';
-import TokensTab from '../pages/home/tokens-tab';
-import NetworkManager from '../pages/network-manager';
+import NetworkFilter from '../pages/networks/network-filter';
+import SelectNetworkModal from '../pages/networks/select-network-modal';
+import NetworksPage from '../pages/networks/networks-page';
 
 // TODO: Replace this fixed delay with a deterministic wait. Non-EVM accounts (Tron, Bitcoin) are created
 // asynchronously at runtime via BIP44 stage-2 alignment, and the Snap only kicks
@@ -20,12 +21,37 @@ const NON_EVM_NETWORKS_NEEDING_DELAY = ['Tron', 'Bitcoin'];
  */
 export const selectAllNetworksFromNetworkSelect = async (driver: Driver) => {
   console.log('Selecting all networks');
-  const tokensTab = new TokensTab(driver);
-  const networkManager = new NetworkManager(driver);
+  const networkFilter = new NetworkFilter(driver);
+  const selectNetworkModal = new SelectNetworkModal(driver);
 
-  await tokensTab.openNetworksFilter();
-  await networkManager.checkPageIsLoaded();
-  await networkManager.selectAllNetworks();
+  await networkFilter.open();
+  await selectNetworkModal.checkPageIsLoaded();
+  await selectNetworkModal.selectAllNetworks();
+};
+
+/**
+ * Opens the network filter from the asset list, navigates to the networks page
+ * and deletes the given network, then returns to the asset list.
+ *
+ * @param driver - The webdriver instance.
+ * @param hexChainId - The hexadecimal chain id of the network to delete.
+ */
+export const deleteNetworkFromNetworkSelect = async (
+  driver: Driver,
+  hexChainId: `0x${string}`,
+) => {
+  console.log(`Deleting network: ${hexChainId}`);
+  const networkFilter = new NetworkFilter(driver);
+  const selectNetworkModal = new SelectNetworkModal(driver);
+  const networksPage = new NetworksPage(driver);
+
+  await networkFilter.open();
+  await selectNetworkModal.checkPageIsLoaded();
+  await selectNetworkModal.clickManageNetworks();
+  await networksPage.checkPageIsLoaded();
+  // The networks page keys its list items by CAIP chain id.
+  await networksPage.deleteNetwork(toEvmCaipChainId(hexChainId));
+  await networksPage.clickCloseButton();
 };
 
 /**
@@ -33,33 +59,31 @@ export const selectAllNetworksFromNetworkSelect = async (driver: Driver) => {
  * network, scoping the asset list to it.
  *
  * @param driver - The webdriver instance.
- * @param networkName - The display name of the network to switch to.
+ * @param network - The display name of the network to switch to, or its CAIP
+ * chain id, e.g. `eip155:1`.
  */
 export const switchToNetworkFromNetworkSelect = async (
   driver: Driver,
-  networkName: string,
+  network: string,
 ) => {
-  console.log(`Switching to network: ${networkName}`);
-  const tokensTab = new TokensTab(driver);
-  const networkManager = new NetworkManager(driver);
-  const homePage = new HomePage(driver);
-  const nonEvmNetworks = ['Bitcoin', 'Solana', 'Tron'];
-  if (nonEvmNetworks.includes(networkName)) {
-    // Wait for snap accounts to be ready before switching networks, to prevent race conditions
-    await homePage.waitForNonEvmAccountsLoaded();
-  }
-  await networkManager.openNetworkManager();
+  console.log(`Switching to network: ${network}`);
+  const networkFilter = new NetworkFilter(driver);
+  const selectNetworkModal = new SelectNetworkModal(driver);
 
-  if (NON_EVM_NETWORKS_NEEDING_DELAY.includes(networkName)) {
+  if (NON_EVM_NETWORKS_NEEDING_DELAY.includes(network)) {
     await driver.delay(NON_EVM_SNAP_READY_DELAY_MS);
   }
 
-  await tokensTab.openNetworksFilter();
-  await networkManager.checkPageIsLoaded();
-  await networkManager.selectNetworkByNameWithWait(networkName);
+  await networkFilter.open();
+  await selectNetworkModal.checkPageIsLoaded();
+  if (network.startsWith('eip155:')) {
+    await selectNetworkModal.selectNetworkByChainId(network);
+  } else {
+    await selectNetworkModal.selectNetworkByNameWithWait(network);
+  }
 };
 
-export async function waitForNetworkManagerBackdropToClear(
+export async function waitForNetworkModalBackdropToClear(
   driver: Driver,
 ): Promise<void> {
   await driver.assertElementNotPresent('.modal__backdrop');

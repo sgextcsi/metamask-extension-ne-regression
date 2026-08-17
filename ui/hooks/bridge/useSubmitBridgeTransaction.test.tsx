@@ -254,7 +254,9 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
             {
               "replace": true,
               "state": {
+                "bridgeState": null,
                 "stayOnHomePage": true,
+                "token": null,
               },
             },
           ],
@@ -308,7 +310,9 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
             {
               "replace": true,
               "state": {
+                "bridgeState": null,
                 "stayOnHomePage": true,
+                "token": null,
               },
             },
           ],
@@ -588,9 +592,12 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
     it('submits intent quotes via submitBridgeIntent', async () => {
       const store = makeMockStore();
       submitIntentSpy.mockReturnValueOnce((async () => undefined) as never);
-      const { result } = renderHook(() => useSubmitBridgeTransaction(), {
-        wrapper: makeWrapper(store),
-      });
+      const { result } = renderHook(
+        () => useSubmitBridgeTransaction('fiat_value'),
+        {
+          wrapper: makeWrapper(store),
+        },
+      );
 
       const quoteWithIntent = {
         ...DummyQuotesWithApproval.ETH_11_USDC_TO_ARB[0],
@@ -612,12 +619,15 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
         location: 'Main View',
         tokenSecurityTypeDestination: null,
         activeAbTests: undefined,
+        inputPrimaryDenomination: 'fiat_value',
       });
       expect(submitTxSpy).not.toHaveBeenCalled();
       expect(mockUseNavigate).toHaveBeenCalledWith(DEFAULT_ROUTE, {
         replace: true,
         state: {
+          bridgeState: null,
           stayOnHomePage: true,
+          token: null,
         },
       });
       expect(resetBridgeStoreSpy).not.toHaveBeenCalled();
@@ -759,6 +769,8 @@ describe('ui/hooks/bridge/useSubmitBridgeTransaction', () => {
       expect(mockUseNavigate).toHaveBeenCalledWith(DEFAULT_ROUTE, {
         replace: true,
         state: {
+          bridgeState: null,
+          token: null,
           stayOnHomePage: true,
         },
       });

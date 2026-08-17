@@ -9,6 +9,7 @@ import {
   BRIDGE_QUOTE_MAX_RETURN_DIFFERENCE_PERCENTAGE,
   getNativeAssetForChainId,
   type BridgeAppState as BridgeAppStateFromController,
+  type InputPrimaryDenomination,
   selectBridgeQuotes,
   selectIsQuoteExpired,
   selectBridgeFeatureFlags,
@@ -516,6 +517,17 @@ export const getToChain = createSelector(
 export const getFromAmount = (state: BridgeAppState): string | null =>
   state.bridge.fromTokenInputValue;
 
+export const getInputPrimaryDenomination = (
+  state: BridgeAppState,
+): InputPrimaryDenomination =>
+  state.metamask.inputPrimaryDenomination ?? 'token_amount';
+
+export const getIsFiatToggleEnabled = createSelector(
+  getRemoteFeatureFlags,
+  (flags): boolean =>
+    (flags as { enableFiatToggle?: boolean }).enableFiatToggle === true,
+);
+
 export const getAccountGroupNameByInternalAccount = createSelector(
   [getAllAccountGroups, (_, account: InternalAccount | null) => account],
   (accountGroups: AccountGroupObject[], account) => {
@@ -833,8 +845,13 @@ export const getFromAmountInCurrency = createSelector(
 
 export const getTxAlerts = (state: BridgeAppState) => state.bridge.txAlert;
 
-export const getActiveQuotePriceData = (state: BridgeAppState) =>
-  getBridgeQuotes(state).activeQuote?.quote?.priceData;
+export const getActiveQuotePriceData = (state: BridgeAppState) => {
+  const priceData = getBridgeQuotes(state).activeQuote?.quote?.priceData;
+  if (!priceData?.priceImpact?.amount) {
+    return undefined;
+  }
+  return priceData;
+};
 
 export const getPriceImpact = (state: BridgeAppState) =>
   getPriceImpactNumber(getBridgeQuotes(state).activeQuote);
@@ -847,7 +864,7 @@ export const getFormattedPriceImpactPercentage = createSelector(
 export const getFormattedPriceImpactFiat = createSelector(
   [
     (state: BridgeAppState) =>
-      getBridgeQuotes(state).activeQuote?.priceImpact?.valueInCurrency,
+      getActiveQuotePriceData(state)?.priceImpact?.valueInCurrency,
     getCurrentCurrency,
   ],
   (priceImpact, currentCurrency) =>
