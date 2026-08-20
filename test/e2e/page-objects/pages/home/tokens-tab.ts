@@ -42,31 +42,6 @@ class TokensTab extends HomePage {
     tag: 'p',
   };
 
-<<<<<<< HEAD
-  private readonly currentNetworkOption =
-    '[data-testid="network-filter-current__button"]';
-
-  private readonly customNetworkSelectedOption = (networkName: string) => {
-    return {
-      css: '.dropdown-editor__item-dropdown',
-      text: networkName,
-    };
-  };
-
-  private readonly multichainNetworkListItemByNameXpath = (
-    networkName: string,
-  ) => {
-    return `//*[starts-with(@data-testid, "network-list-item-eip155:") and .//*[@data-testid="${networkName}"]]`;
-  };
-
-  private readonly multichainNetworkLabelByName = (networkName: string) => {
-    return `[data-testid="${networkName}"]`;
-  };
-
-  private readonly currentNetworksTotal = `${this.currentNetworkOption} [data-testid="account-value-and-suffix"]`;
-
-=======
->>>>>>> upstream/main
   private readonly customTokenImportAddressInput =
     '[data-testid="custom-token-import-address-input"]';
 

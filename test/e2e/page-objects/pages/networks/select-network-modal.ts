@@ -64,21 +64,7 @@ class SelectNetworkModal {
   private readonly networkListItemByName = (networkName: string) =>
     `[data-testid="${networkName}"]`;
 
-<<<<<<< HEAD:test/e2e/page-objects/pages/network-manager.ts
-  private readonly networkManagerToggle = '[data-testid="sort-by-networks"]';
-
-  private readonly networkPopupDeleteButton = {
-    text: 'Delete',
-    tag: 'button',
-  };
-
-  private readonly networksPageBackButton =
-    '[data-testid="page-header-back-button"]';
-
-  private readonly networksPageList = '[data-testid="networks-page-list"]';
-=======
   private readonly networkListItemClass = '.multichain-network-list-item';
->>>>>>> upstream/main:test/e2e/page-objects/pages/networks/select-network-modal.ts
 
   private readonly selectedAllNetworksItem = `${this.allNetworksItem}.bg-muted`;
 

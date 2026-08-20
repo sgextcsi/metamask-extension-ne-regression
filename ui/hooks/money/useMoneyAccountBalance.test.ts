@@ -406,26 +406,16 @@ describe('useMoneyAccountBalance', () => {
       expect(result.current.apyPercentFormatted).toBe('4%');
     });
 
-<<<<<<< HEAD
-    it('withholds the fallback during the first load, so the rate cannot flicker', () => {
-=======
     it('uses the fallback during the first load', () => {
->>>>>>> upstream/main
       stubQueries(BALANCE_LOADED, APY_LOADING);
 
       const { result } = renderBalanceHook(undefined, {
         vaultApyFallback: 0.04,
       });
 
-<<<<<<< HEAD
-      expect(result.current.apyDecimal).toBeUndefined();
-      expect(result.current.apyPercent).toBeUndefined();
-      expect(result.current.apyPercentFormatted).toBeUndefined();
-=======
       expect(result.current.apyDecimal).toBe(0.04);
       expect(result.current.apyPercent).toBe(4);
       expect(result.current.apyPercentFormatted).toBe('4%');
->>>>>>> upstream/main
     });
 
     it('reports no APY at all when the service is empty and no fallback is served', () => {
@@ -451,8 +441,6 @@ describe('useMoneyAccountBalance', () => {
       expect(result.current.apyPercentFormatted).toBe('3.8%');
     });
 
-<<<<<<< HEAD
-=======
     it('formats a service APY with more than 15 significant digits', () => {
       stubQueries(BALANCE_LOADED, {
         ...APY_LOADED,
@@ -466,7 +454,6 @@ describe('useMoneyAccountBalance', () => {
       expect(result.current.apyPercentFormatted).toBe('6.9%');
     });
 
->>>>>>> upstream/main
     it('rounds the percentage down when the next digit is below half', () => {
       stubQueries(BALANCE_LOADED, {
         ...APY_LOADED,
