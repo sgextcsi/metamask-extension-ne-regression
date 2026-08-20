@@ -445,64 +445,6 @@ export function useTransactionCustomAmount({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- see comment above
   }, [depositPrefill.hasPrefilled, shouldUseDepositPrefill]);
 
-  const applyDepositPrefillAmount = useCallback(
-    (fiatAmount: string) => {
-      const balanceUsdValue = new BigNumber(String(balanceUsd ?? 0));
-      const prefillFiat = new BigNumber(fiatAmount);
-
-      if (
-        !balanceUsdValue.isFinite() ||
-        balanceUsdValue.lte(0) ||
-        !prefillFiat.isFinite()
-      ) {
-        return;
-      }
-
-      // Money-account deposits keep isMaxAmount false (matches mobile) so the
-      // typed fiat amount is what gets submitted, not the raw token balance.
-      if (isMaxAmount) {
-        setIsMax(false);
-      }
-
-      if (transactionId) {
-        upsertTransactionUIMetricsFragment(transactionId, {
-          properties: {
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            mm_pay_amount_input_type: 'prefilled_max',
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            mm_pay_quote_requested: true,
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            mm_pay_prefilled_amount: Number(fiatAmount),
-          },
-        });
-      }
-
-      setAmountFiat(fiatAmount);
-
-      const newAmountHuman = getAmountHumanFromFiat(
-        fiatAmount,
-        tokenFiatRate,
-        hasBalanceUsdOverride,
-      );
-
-      debounceRef.current?.cancel();
-      setAmountHumanDebounced(newAmountHuman);
-      if (!disableUpdate) {
-        updateTokenAmountCallback(newAmountHuman);
-      }
-    },
-    [
-      balanceUsd,
-      disableUpdate,
-      hasBalanceUsdOverride,
-      isMaxAmount,
-      setIsMax,
-      tokenFiatRate,
-      transactionId,
-      updateTokenAmountCallback,
-    ],
-  );
-
   // Money-account deposit prefill (feature-flagged). Re-applies when the pay
   // token or funding account changes, unless the user has edited the amount.
   // Only `hasPrefilled` is a dependency (matches mobile): balance updates on
