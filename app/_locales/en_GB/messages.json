@@ -5413,9 +5413,6 @@
     "message": "Earn on your crypto"
   },
   "moneyEarnOnCryptoDescription": {
-<<<<<<< HEAD
-    "message": "Fund your Money account using eligible assets already in your wallet."
-=======
     "message": "See how your money can grow over time by converting your crypto to mUSD."
   },
   "moneyEarnOnCryptoDescriptionMiddle": {
@@ -5429,20 +5426,16 @@
   },
   "moneyEarnOnCryptoNoFee": {
     "message": "No fee"
->>>>>>> upstream/main
   },
   "moneyEarnTitle": {
     "message": "Earn on your balance"
   },
-<<<<<<< HEAD
-=======
   "moneyEarnings": {
     "message": "Earnings"
   },
   "moneyExploreBenefits": {
     "message": "Explore your benefits"
   },
->>>>>>> upstream/main
   "moneyFundDescription": {
     "message": "Fund your Money account and watch your balance grow."
   },
@@ -5455,26 +5448,16 @@
   "moneyHowItWorksDescription": {
     "message": "Add mUSD and your dollar-backed balance is ready to spend, trade, or send anytime."
   },
-<<<<<<< HEAD
-  "moneyHowItWorksPrefix": {
-    "message": "Add mUSD and earn up to"
-  },
-  "moneyHowItWorksSuffix": {
-    "message": "Your balance is dollar-backed and ready to spend, trade, or send anytime."
-=======
   "moneyHowItWorksDescriptionWithApy": {
     "message": "Add mUSD and earn up to $1. Your balance is dollar-backed and ready to spend, trade, or send anytime.",
     "description": "$1 is the current mUSD APY."
   },
   "moneyHowYourMoneyGrows": {
     "message": "How your money grows"
->>>>>>> upstream/main
   },
   "moneyLearnMore": {
     "message": "Learn more"
   },
-<<<<<<< HEAD
-=======
   "moneyLifetime": {
     "message": "Lifetime"
   },
@@ -5484,7 +5467,6 @@
   "moneyMoreInformation": {
     "message": "More information"
   },
->>>>>>> upstream/main
   "moneyMoreOptions": {
     "message": "More options"
   },
